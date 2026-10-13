@@ -168,17 +168,17 @@ public final class ZombieModels {
 
     private static void leaper(ModelSpec s) {
         Paint sk = Paint.of(0x8A9A72).pattern(Pattern.SPOTS, 0x4A5A3A).noise(0.15f);
-        Part body = s.root.child("body", 0, 6, 0).rot(35, 0, 0).box(-3.5f, 0, -2, 7, 10, 4, Paint.of(0x6A7A52).pattern(Pattern.RIBS, 0x4A5A3A));
+        Part body = s.root.child("body", 0, 6, 0).rot(22, 0, 0).box(-3.5f, 0, -2, 7, 10, 4, Paint.of(0x6A7A52).pattern(Pattern.RIBS, 0x4A5A3A));
         Part head = s.root.child("head", 0, 6, -2).box(-3.5f, -7, -4, 7, 7, 7, Paint.of(0x8A9A72).pattern(Pattern.SPOTS, BLOOD)
                 .face(Face.FRONT, DecalType.SLIT_EYES, 0xFFB020, true));
         Part rarm = s.root.child("rarm", -5, 8, -1).box(-1.5f, -1, -1.5f, 3, 14, 3, sk);
         Part larm = s.root.child("larm", 5, 8, -1).box(-1.5f, -1, -1.5f, 3, 14, 3, sk);
         rarm.child("claw_r", 0, 13, 0).box(-2, 0, -2, 4, 4, 1, Paint.of(BONE));
         larm.child("claw_l", 0, 13, 0).box(-2, 0, -2, 4, 4, 1, Paint.of(BONE));
-        Part rthigh = s.root.child("rleg", -2.5f, 14, 0).rot(-40, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
-        Part lthigh = s.root.child("lleg", 2.5f, 14, 0).rot(-40, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
-        rthigh.child("rshin", 0, 7, 0).rot(80, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
-        lthigh.child("lshin", 0, 7, 0).rot(80, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
+        Part rthigh = s.root.child("rleg", -2.5f, 14, 0).rot(-25, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
+        Part lthigh = s.root.child("lleg", 2.5f, 14, 0).rot(-25, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
+        rthigh.child("rshin", 0, 7, 0).rot(50, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
+        lthigh.child("lshin", 0, 7, 0).rot(50, 0, 0).box(-1.5f, 0, -1.5f, 3, 7, 3, sk);
         Rig r = rigOf(s, body, head, rarm, larm);
         rankGear(r, 7, 0.8f);
     }

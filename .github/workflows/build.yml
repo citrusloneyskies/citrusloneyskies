@@ -93,6 +93,8 @@ jobs:
         run: |
           pip install -q pillow
           mkdir -p docs/screenshots
+          rm -f docs/screenshots/*.jpg
+          grep -nE "Exception|ERROR|FATAL|Caused by|Showcase" client.log | grep -viE "openal|alsa|sound|realms" | head -n 200 > docs/screenshots/client_log_summary.txt || true
           python3 - <<'PY'
           import glob, os
           from PIL import Image

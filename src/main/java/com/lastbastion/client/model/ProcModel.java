@@ -67,7 +67,7 @@ public class ProcModel<T extends Entity> extends EntityModel<T> {
 
     @Override
     public void renderToBuffer(PoseStack pose, VertexConsumer vc, int light, int overlay, float r, float g, float b, float a) {
-        baked.root.render(pose, vc, light, overlay, r * tintR, g * tintG, b * tintB, a * alpha);
+        baked.root.render(pose, vc, light, overlay, Math.min(1f, r * tintR), Math.min(1f, g * tintG), Math.min(1f, b * tintB), Math.min(1f, a * alpha));
     }
 
     /** Render with explicit colour (used by glow layers and block entity renderers). */

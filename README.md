@@ -5,6 +5,12 @@ zombie siege that comes every night from every direction and gets harder each wa
 You spend them at the core on turrets, heroes, weapons, call-ins and fortifications. If the core falls,
 the siege starts again from wave 1.
 
+## Installing
+1. Install **Forge 1.20.1** (47.3.0 or newer).
+2. Build the jar with `./gradlew build` (or grab `lastbastion-jar` from the latest GitHub Actions run). The jar is
+   `build/libs/lastbastion-1.20.1-1.0.0.jar`.
+3. Put it in your `.minecraft/mods` folder. It is needed on both the server and the client.
+
 ## Getting started
 
 1. Craft a **Siege Core**:

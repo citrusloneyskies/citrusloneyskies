@@ -64,11 +64,12 @@ public final class Showcase {
         SHOTS.add(new Shot("04_zombies_rank5_b", new Vec3(19.8, y + 2.8, 5), 0, 10));
         SHOTS.add(new Shot("05_heroes_a", new Vec3(8.5, y + 3, 18), 0, 10));
         SHOTS.add(new Shot("06_heroes_b", new Vec3(35, y + 5, 13), 0, 12));
-        SHOTS.add(new Shot("07_turrets", new Vec3(11, y + 5, 36), 0, 24));
-        SHOTS.add(new Shot("08_bosses_a", new Vec3(7, y + 7, 55), 0, 12));
-        SHOTS.add(new Shot("09_bosses_b", new Vec3(35, y + 9, 52), 0, 14));
-        SHOTS.add(new Shot("10_bosses_c", new Vec3(63, y + 8, 54), 0, 12));
-        SHOTS.add(new Shot("11_core", new Vec3(-10, y + 2.2, -5), 0, 12));
+        SHOTS.add(new Shot("07_turrets_a", new Vec3(5, y + 2.4, 39), 0, 14));
+        SHOTS.add(new Shot("08_turrets_b", new Vec3(17.5, y + 2.4, 39), 0, 14));
+        SHOTS.add(new Shot("09_bosses_a", new Vec3(7, y + 5, 58), 0, 10));
+        SHOTS.add(new Shot("10_bosses_b", new Vec3(35, y + 7, 55), 0, 12));
+        SHOTS.add(new Shot("11_bosses_c", new Vec3(63, y + 6, 58), 0, 8));
+        SHOTS.add(new Shot("12_core", new Vec3(-10, y + 2.2, -5), 0, 12));
     }
 
     private Showcase() {
@@ -114,17 +115,17 @@ public final class Showcase {
                         stage = 4;
                         MinecraftServer server = mc.getSingleplayerServer();
                         if (server != null) server.execute(() -> startBattle(server));
-                        moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 16, -22), 0, 38));
+                        moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 9, -16), 0, 22));
                     } else {
                         moveTo(mc, SHOTS.get(shot));
                     }
                 }
             }
             case 4 -> {
-                if (ticks == 200) grab(mc, "12_battle_a");
-                if (ticks == 400) grab(mc, "13_battle_b");
+                if (ticks == 200) grab(mc, "13_battle_a");
+                if (ticks == 400) grab(mc, "14_battle_b");
                 if (ticks == 401) moveTo(mc, new Shot("battle2", new Vec3(-26, GROUND + 5, 0), -90, 10));
-                if (ticks == 520) grab(mc, "14_battle_c");
+                if (ticks == 520) grab(mc, "15_battle_c");
                 if (ticks == 530) {
                     LastBastion.LOGGER.info("[Showcase] complete");
                     mc.stop();

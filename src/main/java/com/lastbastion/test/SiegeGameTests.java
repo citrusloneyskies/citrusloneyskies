@@ -147,8 +147,8 @@ public final class SiegeGameTests {
     public static void shopPurchaseAndUpgrade(GameTestHelper h) {
         BlockPos core = setup(h);
         ServerLevel level = h.getLevel();
-        net.minecraft.server.level.ServerPlayer p = h.makeMockServerPlayerInLevel();
-        p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "siege_tester"));
         p.moveTo(core.getX() + 2.5, core.getY(), core.getZ() + 0.5);
         SiegeData d = SiegeManager.data(level);
         d.credits.put(p.getUUID(), 2000);
