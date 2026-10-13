@@ -330,7 +330,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             if (m == HeroMode.GUARD) {
                 score = e.position().distanceTo(corePos) + distanceTo(e) * 0.3;
             } else if (m == HeroMode.FOLLOW) {
-                score = e.distanceTo(owner) + (e.getTarget() == owner ? -6 : 0);
+                score = e.distanceTo(owner) + (e instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == owner ? -6 : 0);
             } else {
                 score = distanceTo(e);
                 if (e instanceof SiegeEnemy se && se.isHighPriority()) score -= 25;
@@ -521,7 +521,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     public boolean hurt(DamageSource source, float amount) {
         if (source.getEntity() instanceof Player p && !p.isCreative()) return false;
         if (kind.flying && source.is(net.minecraft.tags.DamageTypeTags.IS_FALL)) return false;
-        if (source.is(net.minecraft.tags.DamageTypeTags.IN_WALL)) return false;
+        if (source.is(net.minecraft.world.damagesource.DamageTypes.IN_WALL)) return false;
         boolean r = super.hurt(source, amount);
         if (r) lastDamaged = tickCount;
         return r;

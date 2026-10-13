@@ -203,7 +203,7 @@ public final class SiegeDamage {
 
     public static void push(Entity e, Vec3 from, double strength, double lift) {
         Vec3 dir = e.position().subtract(from).multiply(1, 0, 1);
-        if (dir.lengthSqr() < 1e-4) dir = new Vec3(e.getRandom().nextDouble() - 0.5, 0, e.getRandom().nextDouble() - 0.5);
+        if (dir.lengthSqr() < 1e-4) dir = new Vec3(e.level().random.nextDouble() - 0.5, 0, e.level().random.nextDouble() - 0.5);
         dir = dir.normalize().scale(strength);
         double resist = e instanceof LivingEntity le ? le.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE) : 0;
         double f = Math.max(0.1, 1.0 - resist);
