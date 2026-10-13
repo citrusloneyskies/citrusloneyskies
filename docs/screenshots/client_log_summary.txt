@@ -1,0 +1,19 @@
+55:[19:00:50] [Render thread/ERROR] [mojang/Narrator]: Error while loading the narrator
+56:com.mojang.text2speech.Narrator$InitializeException: Failed to load library flite
+79:Caused by: java.lang.UnsatisfiedLinkError: Unable to load library 'flite':
+293:[19:01:12] [IO-Worker-4/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 01_zombies_rank1_a.png
+294:[19:01:15] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 02_zombies_rank1_b.png
+295:[19:01:18] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 03_zombies_rank5_a.png
+296:[19:01:21] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 04_zombies_rank5_b.png
+297:[19:01:23] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 05_heroes_a.png
+298:[19:01:26] [IO-Worker-6/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 06_heroes_b.png
+299:[19:01:29] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 07_turrets_a.png
+300:[19:01:32] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 08_turrets_b.png
+301:[19:01:35] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 09_bosses_a.png
+302:[19:01:37] [IO-Worker-4/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 10_bosses_b.png
+303:[19:01:40] [IO-Worker-7/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 11_bosses_c.png
+304:[19:01:43] [IO-Worker-7/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 12_core.png
+306:[19:01:53] [IO-Worker-7/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 13_battle_a.png
+307:[19:02:03] [IO-Worker-5/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 14_battle_b.png
+308:[19:02:09] [IO-Worker-6/INFO] [co.la.LastBastion/]: [Showcase] Saved screenshot as 15_battle_c.png
+309:[19:02:10] [Render thread/INFO] [co.la.LastBastion/]: [Showcase] complete
