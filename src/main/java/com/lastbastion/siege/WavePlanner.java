@@ -127,6 +127,9 @@ public final class WavePlanner {
             case WRAITH -> 2.5f;
             case WRECKER -> 2f;
             case NECROMANCER -> 1f;
+            case CRAWLER -> 4.5f;
+            case INCINERATOR -> 1.8f;
+            case ABOMINATION -> 0.8f;
         };
         if (k.unlockWave == wave) w *= 2f;
         return w;
@@ -141,8 +144,8 @@ public final class WavePlanner {
         double rankCentre = (wave - 1) / 7.0 - (mod == NightModifier.HORDE ? 1.0 : 0.0);
         float champChance = wave >= 4 ? Math.min(0.15f, 0.02f + 0.005f * wave) : 0f;
         if (mod == NightModifier.ELITE) champChance *= 3f;
-        int maxShriekers = 1 + wave / 10, maxNecros = 1 + wave / 12;
-        int shriekers = 0, necros = 0;
+        int maxShriekers = 1 + wave / 10, maxNecros = 1 + wave / 12, maxAboms = wave / 8, maxIncin = 1 + wave / 7;
+        int shriekers = 0, necros = 0, aboms = 0, incins = 0;
 
         List<ZombieKind> pool = new ArrayList<>();
         for (ZombieKind k : ZombieKind.values()) if (k.unlockWave <= wave) pool.add(k);
@@ -152,6 +155,8 @@ public final class WavePlanner {
             ZombieKind kind = pick(pool, wave, rnd);
             if (kind == ZombieKind.SHRIEKER && shriekers >= maxShriekers) continue;
             if (kind == ZombieKind.NECROMANCER && necros >= maxNecros) continue;
+            if (kind == ZombieKind.ABOMINATION && aboms >= maxAboms) continue;
+            if (kind == ZombieKind.INCINERATOR && incins >= maxIncin) continue;
             int rank = Mth.clamp((int) Math.round(rankCentre + rnd.nextGaussian() * 0.8), 0, 4);
             int affixes = 0;
             if (rnd.nextFloat() < champChance) {
@@ -171,6 +176,8 @@ public final class WavePlanner {
             budget -= cost;
             if (kind == ZombieKind.SHRIEKER) shriekers++;
             if (kind == ZombieKind.NECROMANCER) necros++;
+            if (kind == ZombieKind.ABOMINATION) aboms++;
+            if (kind == ZombieKind.INCINERATOR) incins++;
             units.add(new Unit(kind.ordinal(), rank, affixes));
         }
 

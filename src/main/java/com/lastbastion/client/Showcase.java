@@ -65,7 +65,7 @@ public final class Showcase {
     }
 
     static double zombieX(int i) {
-        return i * 5.0;
+        return i * 8.0;
     }
 
     static double heroX(int i) {
@@ -87,10 +87,11 @@ public final class Showcase {
         SHOTS.add(new Shot(String.format("%02d_vfx", n++), new Vec3(12, y + 6, VFX_Z - 15), 0, 16));
         SHOTS.add(new Shot(String.format("%02d_core", n++), new Vec3(-10, y + 2.4, -5.2), 0, 14));
         ZombieKind[] zk = ZombieKind.values();
-        for (int i = 0; i < zk.length; i += 2) {
-            double cx = (zombieX(i) + zombieX(Math.min(zk.length - 1, i + 1)) + 1.8) / 2;
-            String label = zk[i].name().toLowerCase() + (i + 1 < zk.length ? "_" + zk[i + 1].name().toLowerCase() : "");
-            SHOTS.add(new Shot(String.format("%02d_zombies_%s", n++, label), new Vec3(cx, y + 1.9, ZOMBIE_Z - 5.4), 0, 12));
+        for (int i = 0; i < zk.length; i++) {
+            EntityDimensions d = zk[i].type().get().getDimensions();
+            double h = d.height * 1.18;
+            double dist = Math.max(4.2, h * 1.45 + 2.6);
+            SHOTS.add(new Shot(String.format("%02d_zombie_%s", n++, zk[i].id), new Vec3(zombieX(i) + 1.7, y + h * 0.55 + 0.35, ZOMBIE_Z - dist), 0, 10));
         }
         HeroKind[] hk = HeroKind.values();
         for (int i = 0; i < hk.length; i++) {
@@ -210,11 +211,13 @@ public final class Showcase {
         }
         ZombieKind[] zk = ZombieKind.values();
         for (int i = 0; i < zk.length; i++) {
-            double x = zombieX(i);
-            SiegeZombie z = ZombieSpawner.spawn(level, zk[i], ZombieRank.ROTTEN, 0, new Vec3(x, GROUND, ZOMBIE_Z), false, false);
-            if (z != null) pose(z, level, x, GROUND, ZOMBIE_Z, false);
-            SiegeZombie z5 = ZombieSpawner.spawn(level, zk[i], ZombieRank.ABYSSAL, i % 4 == 0 ? 1 << (i % 10) : 0, new Vec3(x + 1.8, GROUND, ZOMBIE_Z), false, false);
-            if (z5 != null) pose(z5, level, x + 1.8, GROUND, ZOMBIE_Z, false);
+            double gap = Math.max(1.5, zk[i].type().get().getDimensions().width + 0.7);
+            ZombieRank[] ranks = {ZombieRank.ROTTEN, ZombieRank.ARMORED, ZombieRank.ABYSSAL};
+            for (int j = 0; j < 3; j++) {
+                double x = zombieX(i) + 1.7 + (j - 1) * gap;
+                SiegeZombie z = ZombieSpawner.spawn(level, zk[i], ranks[j], 0, new Vec3(x, GROUND, ZOMBIE_Z), false, false);
+                if (z != null) pose(z, level, x, GROUND, ZOMBIE_Z, false);
+            }
         }
         HeroKind[] hk = HeroKind.values();
         for (int i = 0; i < hk.length; i++) {

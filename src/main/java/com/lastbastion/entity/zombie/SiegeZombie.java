@@ -172,6 +172,13 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
         }
     }
 
+    /** Force this zombie to fight {@code by} for {@code ticks} (hero taunts). */
+    public void taunt(LivingEntity by, int ticks) {
+        tauntedBy = by.getUUID();
+        tauntTicks = Math.max(tauntTicks, ticks);
+        setTarget(by);
+    }
+
     public void beginRise() {
         riseLeft = RISE_TICKS;
         entityData.set(RISE, RISE_TICKS);

@@ -486,7 +486,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
             SiegeDamage.push(e, position(), 0.9, 0.35);
             onMeleeHit(level, e);
         }
-        Vfx.slash(level, position().add(0, getBbHeight() * 0.5, 0), getYRot(), 15, 150, meleeReach(), dangerColor(), 0xFFFFFF, 9, 0.3f);
+        Vfx.slash(level, position().add(0, getBbHeight() * 0.5, 0), getYRot(), 15, 150, (float) meleeReach(), dangerColor(), 0xFFFFFF, 9, 0.3f);
         Fx.sound(level, c, SoundEvents.PLAYER_ATTACK_SWEEP, 1.2f, 0.6f);
     }
 

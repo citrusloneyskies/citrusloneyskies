@@ -1,0 +1,9 @@
+-proc:none
+-Xmaxerrs
+100000
+-XDshould-stop.ifError=FLOW
+-sourcepath
+src/main/java
+-d
+/tmp/claude-0/-home-user-test/abc8da32-5588-5158-8e3c-2100b269509d/scratchpad/jcf
+src/main/java/com/lastbastion/registry/ModEntities.java

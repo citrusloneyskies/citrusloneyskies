@@ -156,10 +156,8 @@ public class BastionHero extends HeroEntity {
                     Vfx.ring(level, position().add(0, 0.05, 0), 0xFFB040, 11, 18, 1.2f);
                     Vfx.shake(level, position(), 0.5f, 16, 10);
                     for (LivingEntity e : enemiesNear(level, 11)) {
-                        if (e instanceof Mob m && !(e instanceof SiegeEnemy se && se.isHighPriority() && random.nextBoolean())) {
-                            m.setTarget(this);
-                            e.getPersistentData().putInt("lb_taunt", tickCount + 100);
-                        }
+                        if (e instanceof com.lastbastion.entity.zombie.SiegeZombie z) z.taunt(this, 100);
+                        else if (e instanceof Mob m && !(e instanceof SiegeEnemy se && se.isHighPriority() && random.nextBoolean())) m.setTarget(this);
                     }
                     addEffect(new MobEffectInstance(ModEffects.AEGIS.get(), 100, 0));
                 }

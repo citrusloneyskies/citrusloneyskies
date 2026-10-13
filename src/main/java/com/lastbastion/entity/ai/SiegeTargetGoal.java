@@ -31,7 +31,7 @@ public class SiegeTargetGoal extends Goal {
     @Override
     public boolean canUse() {
         if (mob.isIncapacitated() || mob.hasEffect(ModEffects.FEARED.get())) return false;
-        if (--scan > 0) return false;
+        if (--scan > 0 && mob.tauntedBy == null) return false;
         scan = 10;
         LivingEntity t = pick();
         if (t != null) {
@@ -89,7 +89,7 @@ public class SiegeTargetGoal extends Goal {
         LivingEntity t = mob.getTarget();
         if (t == null || !valid(t) || mob.isIncapacitated() || mob.hasEffect(ModEffects.FEARED.get())) return false;
         engagedTicks++;
-        if (mob.tauntedBy != null && mob.tauntedBy.equals(t.getUUID())) return true;
+        if (mob.tauntedBy != null) return mob.tauntedBy.equals(t.getUUID());
         double leash = Math.max(mob.aggroRange(), mob.targetsTurrets() ? 24 : 0) + 8;
         if (mob.distanceToSqr(t) > leash * leash) return false;
         boolean recentlyHurt = mob.getLastHurtByMob() == t && mob.tickCount - mob.getLastHurtByMobTimestamp() < 100;

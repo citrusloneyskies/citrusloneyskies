@@ -52,6 +52,9 @@ public final class ModEntities {
         ZOMBIES.put(ZombieKind.WRAITH, reg("wraith", WraithZombie::new, MobCategory.MONSTER, 0.6f, 2.0f, 10));
         ZOMBIES.put(ZombieKind.WRECKER, reg("wrecker", WreckerZombie::new, MobCategory.MONSTER, 0.9f, 2.3f, 10));
         ZOMBIES.put(ZombieKind.NECROMANCER, reg("necromancer", NecromancerZombie::new, MobCategory.MONSTER, 0.6f, 2.1f, 10));
+        ZOMBIES.put(ZombieKind.CRAWLER, reg("crawler", CrawlerZombie::new, MobCategory.MONSTER, 0.8f, 0.7f, 10));
+        ZOMBIES.put(ZombieKind.INCINERATOR, reg("incinerator", IncineratorZombie::new, MobCategory.MONSTER, 0.75f, 2.0f, 10));
+        ZOMBIES.put(ZombieKind.ABOMINATION, reg("abomination", AbominationZombie::new, MobCategory.MONSTER, 1.6f, 3.2f, 10));
 
         BOSSES.put(BossKind.GOREHOUND, reg("gorehound", GorehoundBoss::new, MobCategory.MONSTER, 1.8f, 3.6f, 16));
         BOSSES.put(BossKind.PLAGUE_MOTHER, reg("plague_mother", PlagueMotherBoss::new, MobCategory.MONSTER, 3.0f, 2.8f, 16));

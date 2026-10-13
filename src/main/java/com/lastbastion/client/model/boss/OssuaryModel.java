@@ -57,7 +57,7 @@ public final class OssuaryModel implements BossModels.Def {
                 .decal(Face.TOP, DecalType.SKULL, 0x3A3028, false, 0.5f, 0.5f, 1.1f);
         Paint iron = p(Mat.DARK_METAL, 0x3A3632).accent(0x1E1A16).grime(0.6f).pattern(Pattern.SPOTS, 0x6A3A1A, 1.5f);
         Paint chain = p(Mat.METAL, 0x5A5A5E).pattern(Pattern.CHAINMAIL, 0x8A8A90, 2f).grime(0.5f);
-        Paint shroud = p(Mat.CLOTH, 0x6A6458).accent(0x3A362E).grime(0.6f).pattern(Pattern.CLOTH, 0x4A4438, 2f);
+        Paint shroudP = p(Mat.CLOTH, 0x6A6458).accent(0x3A362E).grime(0.6f).pattern(Pattern.CLOTH, 0x4A4438, 2f);
         Paint earth = p(Mat.STONE, 0x5A4E3E).accent(0x3A3226).grime(0.5f);
         Paint furnace = Paint.glowing(soul).pattern(Pattern.VEINS, 0xFFFFFF, 0.8f);
         Paint flame = Paint.glowing(soul).accent(0xE0FFF0);
@@ -87,9 +87,9 @@ public final class OssuaryModel implements BossModels.Def {
         for (int i = 0; i < 3; i++) b.pelvis.box(-3.4f * K, -4.6f * K + i * 1.6f * K, -2.6f * K, 6.8f * K, 0.9f * K, 5.2f * K, boneDark);
         Part shroud = b.pelvis.child("shroud", 0, 1.2f * K, -3.1f * K);
         float[] sl = {6, 8, 5, 9, 7};
-        for (int i = 0; i < sl.length; i++) shroud.box(-4.4f * K + i * 1.76f * K, 0, -0.3f * K, 1.8f * K, sl[i] * K, 0.5f * K, shroud);
+        for (int i = 0; i < sl.length; i++) shroud.box(-4.4f * K + i * 1.76f * K, 0, -0.3f * K, 1.8f * K, sl[i] * K, 0.5f * K, shroudP);
         Part shroudB = b.pelvis.child("shroud_b", 0, 1.2f * K, 3.1f * K);
-        for (int i = 0; i < sl.length; i++) shroudB.box(-4.4f * K + i * 1.76f * K, 0, -0.2f * K, 1.8f * K, sl[sl.length - 1 - i] * K, 0.5f * K, shroud);
+        for (int i = 0; i < sl.length; i++) shroudB.box(-4.4f * K + i * 1.76f * K, 0, -0.2f * K, 1.8f * K, sl[sl.length - 1 - i] * K, 0.5f * K, shroudP);
 
         // ribcage: static side ribs, two front "doors" of ribs over the furnace, sternum
         for (int i = 0; i < 5; i++) {

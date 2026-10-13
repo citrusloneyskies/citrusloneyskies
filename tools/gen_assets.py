@@ -95,7 +95,8 @@ HEROES = [('ashfang', 'Ashfang the Dire Wolf', 0x8A8F99), ('sylva', 'Sylva the H
           ('anubis', 'Anubis, Judge of the Dead', 0xE0B040), ('zeus', 'Zeus, King of Olympus', 0xF4F06A)]
 ZOMBIES = [('shambler', 'Shambler'), ('runner', 'Runner'), ('spitter', 'Spitter'), ('brute', 'Brute'), ('bloater', 'Bloater'),
            ('leaper', 'Leaper'), ('bulwark', 'Bulwark'), ('burrower', 'Burrower'), ('shrieker', 'Shrieker'), ('wraith', 'Wraith'),
-           ('wrecker', 'Wrecker'), ('necromancer', 'Necromancer')]
+           ('wrecker', 'Wrecker'), ('necromancer', 'Necromancer'), ('crawler', 'Crawler'), ('incinerator', 'Incinerator'),
+           ('abomination', 'Abomination')]
 BOSSES = [('gorehound', 'Gorehound the Butcher'), ('plague_mother', 'The Plague Mother'), ('malgrave', 'Malgrave the Dread Knight'),
           ('ossuary_colossus', 'The Ossuary Colossus'), ('varkhul', 'Varkhul the Lich King'), ('morvathrax', 'Morvathrax the Rotwing')]
 GUNS = [('ravager', "M60 'Ravager' Machine Gun"), ('thunderboom', "'Thunderboom' Scattergun"), ('hellfire', "'Hellfire' Rocket Launcher"),

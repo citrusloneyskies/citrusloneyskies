@@ -6,7 +6,7 @@ import net.minecraft.world.entity.EntityType;
 import java.util.function.Supplier;
 
 /**
- * The twelve regular siege zombie archetypes. Stats are rank I values at wave 1; {@link ZombieRank}
+ * The siege zombie archetypes (twelve regulars, the Crawler, the Incinerator and the elite Abomination). Stats are rank I values at wave 1; {@link ZombieRank}
  * and the wave scaling in {@code WavePlanner} multiply them.
  */
 public enum ZombieKind {
@@ -22,7 +22,10 @@ public enum ZombieKind {
     SHRIEKER   ("shrieker",    30,  2.0, 0.23,  0,   0.0,   2,    16,   4.0f,  9, "Screams to enrage zombies and jam turrets."),
     WRAITH     ("wraith",      24,  5.0, 0.26,  0,   1.0,   7,    15,   3.5f, 11, "Ethereal; phases through walls, resists physical."),
     WRECKER    ("wrecker",     55,  6.0, 0.21,  6,   0.7,   8,    20,   4.5f, 12, "Hunts turrets with a siege hammer."),
-    NECROMANCER("necromancer", 40,  3.0, 0.22,  2,   0.0,   3,    28,   6.0f, 14, "Raises the dead and mends the horde.");
+    NECROMANCER("necromancer", 40,  3.0, 0.22,  2,   0.0,   3,    28,   6.0f, 14, "Raises the dead and mends the horde."),
+    CRAWLER    ("crawler",     12,  2.5, 0.21,  0,   0.0,   3,     5,   0.8f,  3, "Legless and low; clings to ankles and slows."),
+    INCINERATOR("incinerator", 45,  3.0, 0.22,  4,   0.3,   8,    18,   4.0f, 10, "Hoses turrets with fire; its fuel tanks burst on death."),
+    ABOMINATION("abomination",180, 12.0, 0.18,  8,   1.0,  30,    60,  12.0f, 16, "Elite stitched colossus. Hurls crawlers and slams the ground.");
 
     public final String id;
     public final float hp, damage, speed, armor, kbResist;
