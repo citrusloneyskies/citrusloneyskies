@@ -51,6 +51,12 @@ public final class ClientSetup {
     @SubscribeEvent
     public static void overlays(RegisterGuiOverlaysEvent e) {
         e.registerAboveAll("siege_hud", SiegeHud.INSTANCE);
+        e.registerBelowAll("vfx_flash", com.lastbastion.client.fx.ScreenFlash.INSTANCE);
+    }
+
+    @SubscribeEvent
+    public static void particles(net.minecraftforge.client.event.RegisterParticleProvidersEvent e) {
+        e.registerSpriteSet(com.lastbastion.registry.ModParticles.FX.get(), com.lastbastion.client.fx.FxParticle.Provider::new);
     }
 
     @SubscribeEvent

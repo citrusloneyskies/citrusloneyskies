@@ -36,6 +36,7 @@ public final class ClientEvents {
         if (e.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
+        if (!mc.isPaused()) com.lastbastion.client.fx.VfxManager.tick();
         ClientSiegeState.tick();
         while (ClientSetup.HERO_COMMAND.consumeClick()) {
             if (mc.screen == null) mc.setScreen(new HeroCommandScreen());
@@ -68,7 +69,9 @@ public final class ClientEvents {
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent e) {
-        if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES || ClientSiegeState.POPUPS.isEmpty()) return;
+        if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
+        com.lastbastion.client.fx.VfxManager.render(e);
+        if (ClientSiegeState.POPUPS.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         Camera cam = e.getCamera();
         Vec3 cp = cam.getPosition();
@@ -91,6 +94,15 @@ public final class ClientEvents {
             pose.popPose();
         }
         buf.endBatch();
+    }
+
+    @SubscribeEvent
+    public static void onCameraAngles(ViewportEvent.ComputeCameraAngles e) {
+        float[] o = com.lastbastion.client.fx.CameraShake.offsets((float) e.getPartialTick());
+        if (o == null) return;
+        e.setYaw(e.getYaw() + o[0]);
+        e.setPitch(e.getPitch() + o[1]);
+        e.setRoll(e.getRoll() + o[2]);
     }
 
     @SubscribeEvent

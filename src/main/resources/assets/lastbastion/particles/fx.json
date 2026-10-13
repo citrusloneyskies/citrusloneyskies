@@ -1,0 +1,22 @@
+{
+  "textures": [
+    "lastbastion:fx_glow",
+    "lastbastion:fx_spark",
+    "lastbastion:fx_ember",
+    "lastbastion:fx_smoke",
+    "lastbastion:fx_shard",
+    "lastbastion:fx_ring",
+    "lastbastion:fx_soul",
+    "lastbastion:fx_star",
+    "lastbastion:fx_drop",
+    "lastbastion:fx_leaf",
+    "lastbastion:fx_rune",
+    "lastbastion:fx_bolt",
+    "lastbastion:fx_feather",
+    "lastbastion:fx_bubble",
+    "lastbastion:fx_flake",
+    "lastbastion:fx_skull",
+    "lastbastion:fx_debris",
+    "lastbastion:fx_flame"
+  ]
+}

@@ -28,10 +28,12 @@ public class LastBastion {
         ModBlockEntities.BLOCK_ENTITIES.register(bus);
         ModEntities.ENTITIES.register(bus);
         ModEffects.EFFECTS.register(bus);
+        ModParticles.PARTICLES.register(bus);
         ModTabs.TABS.register(bus);
         bus.addListener(ModEntities::attributes);
         bus.addListener(this::setup);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SiegeConfig.SPEC);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, com.lastbastion.config.ClientConfig.SPEC);
         MinecraftForge.EVENT_BUS.register(SiegeEvents.class);
     }
 
