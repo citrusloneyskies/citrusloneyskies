@@ -7,6 +7,10 @@ import com.lastbastion.combat.SiegeEnemy;
 import com.lastbastion.config.SiegeConfig;
 import com.lastbastion.entity.AnimTracker;
 import com.lastbastion.entity.turret.TurretEntity;
+import com.lastbastion.fx.FxStyle;
+import com.lastbastion.fx.Vfx;
+import com.lastbastion.network.Net;
+import com.lastbastion.network.SpeechPacket;
 import com.lastbastion.registry.ModEffects;
 import com.lastbastion.siege.SiegeManager;
 import net.minecraft.ChatFormatting;
@@ -39,6 +43,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
+import net.minecraftforge.network.PacketDistributor;
 
 /**
  * Boss framework: boss bar, HP phases, a skill state machine with wind-ups and timelines, target
@@ -47,6 +52,8 @@ import javax.annotation.Nullable;
  */
 public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     public static final int ANIM_NONE = 0, ANIM_MELEE = 1, ANIM_CORE = 2;
+    /** Shared animation ids (boss skills use 3..27). */
+    public static final int ANIM_STAGGER = 29, ANIM_INTRO = 30, ANIM_PHASE = 28, ANIM_TAUNT = 27;
 
     private static final EntityDataAccessor<Integer> ANIM = SynchedEntityData.defineId(SiegeBoss.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> PHASE = SynchedEntityData.defineId(SiegeBoss.class, EntityDataSerializers.INT);
@@ -66,6 +73,15 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     private int meleeCooldown;
     private int repath;
     private boolean coreSwing;
+    /** Stagger meter 0..100: heavy hits and shrugged-off crowd control fill it; full = stunned and vulnerable. */
+    protected float stagger;
+    private int staggerTicks;
+    private int staggerImmune;
+    private int lastStaggerHit = -1000;
+    private int introTicks;
+    private int lastSpoke = -1000;
+    protected final ServerBossEvent staggerBar = new ServerBossEvent(Component.literal("Stagger"), BossEvent.BossBarColor.YELLOW,
+            BossEvent.BossBarOverlay.PROGRESS);
 
     protected SiegeBoss(EntityType<? extends SiegeBoss> type, Level level, BossKind kind) {
         super(type, level);
@@ -105,10 +121,112 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
         return b;
     }
 
-    /** Dramatic entrance. */
+    /** Dramatic entrance: intro animation, signature effects, a title card and the boss's first words. */
     protected void onArrive(ServerLevel level) {
-        Fx.shockwave(level, position(), 6, 0x400000);
-        level.sendParticles(ParticleTypes.SOUL, getX(), getY() + 1, getZ(), 60, 1.5, 1.5, 1.5, 0.05);
+        introTicks = introLength();
+        anim.play(ANIM_INTRO);
+        Fx.shockwave(level, position(), 6, dangerColor());
+        Vfx.spray(level, FxStyle.SOUL, position().add(0, 1, 0), 0xC8F0FF, dangerColor(), 0.4f, 30, 0.2f, 1);
+        Vfx.screenFlash(level, position(), dangerColor(), 0.25f, 80, 14);
+        Vfx.shake(level, position(), 0.9f, 60, 20);
+        for (ServerPlayer p : level.players()) {
+            if (p.distanceToSqr(this) < 128 * 128) {
+                SiegeManager.title(p, Component.literal(kind.title).withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD),
+                        Component.literal(epithet()).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+            }
+        }
+        speak(Lines.ARRIVE, true);
+    }
+
+    /** Subtitle shown under the boss name when it arrives. */
+    protected String epithet() {
+        return "approaches the walls";
+    }
+
+    protected int introLength() {
+        return 40;
+    }
+
+    /** Colour of this boss's telegraphs and signature effects. */
+    public int dangerColor() {
+        return Vfx.DANGER;
+    }
+
+    // ------------------------------------------------------------------ personality
+
+    public enum Lines {ARRIVE, PHASE, TAUNT, KILL, STAGGER, DEATH, CORE}
+
+    protected String[] lines(Lines which) {
+        return new String[0];
+    }
+
+    public void speak(Lines which, boolean force) {
+        if (!(level() instanceof ServerLevel)) return;
+        if (!force && tickCount - lastSpoke < 260) return;
+        String[] l = lines(which);
+        if (l.length == 0) return;
+        lastSpoke = tickCount;
+        Net.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> this), new SpeechPacket(getId(), l[random.nextInt(l.length)], dangerColor()));
+    }
+
+    /** A one-off line for a specific moment (summons, challenges, signature moves). */
+    protected void say(String text) {
+        if (!(level() instanceof ServerLevel)) return;
+        lastSpoke = tickCount;
+        Net.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> this), new SpeechPacket(getId(), text, dangerColor()));
+    }
+
+    // ------------------------------------------------------------------ telegraphs (hostile: heroes dodge them)
+
+    protected void teleCircle(ServerLevel level, Vec3 c, float r, int ticks) {
+        Vfx.teleCircle(level, c.add(0, 0.05, 0), r, ticks, dangerColor(), true);
+    }
+
+    protected void teleLine(ServerLevel level, Vec3 from, Vec3 to, float w, int ticks) {
+        Vfx.teleLine(level, from.add(0, 0.05, 0), to.add(0, 0.05, 0), w, ticks, dangerColor(), true);
+    }
+
+    protected void teleCone(ServerLevel level, Vec3 from, Vec3 toward, float len, float half, int ticks) {
+        Vfx.teleCone(level, from.add(0, 0.05, 0), toward, len, half, ticks, dangerColor(), true);
+    }
+
+    protected void teleDonut(ServerLevel level, Vec3 c, float inner, float outer, int ticks) {
+        Vfx.teleDonut(level, c.add(0, 0.05, 0), inner, outer, ticks, dangerColor(), true);
+    }
+
+    // ------------------------------------------------------------------ stagger
+
+    public boolean staggered() {
+        return staggerTicks > 0;
+    }
+
+    public float staggerFraction() {
+        return stagger / 100f;
+    }
+
+    protected void addStagger(float amount) {
+        if (staggerTicks > 0 || amount <= 0) return;
+        stagger = Math.min(100, stagger + amount * (staggerImmune > 0 ? 0.4f : 1f));
+        lastStaggerHit = tickCount;
+        if (stagger >= 100 && level() instanceof ServerLevel sl) {
+            staggerTicks = 70;
+            staggerImmune = 400;
+            stagger = 0;
+            skill = 0;
+            skillTick = 0;
+            getNavigation().stop();
+            anim.play(ANIM_STAGGER);
+            Vfx.flash(sl, position().add(0, getBbHeight() * 0.6, 0), 0xFFE060, 2.5f, 8);
+            Vfx.spray(sl, FxStyle.STAR, position().add(0, getBbHeight() + 0.3, 0), 0xFFE060, 0xFFFFFF, 0.3f, 16, 0.15f, 0);
+            Vfx.ring(sl, position().add(0, 0.05, 0), 0xFFE060, getBbWidth() + 3, 14, 1);
+            Fx.sound(sl, position(), SoundEvents.ANVIL_LAND, 2f, 0.5f);
+            speak(Lines.STAGGER, true);
+            for (ServerPlayer p : sl.players()) {
+                if (p.distanceToSqr(this) < 64 * 64) {
+                    p.displayClientMessage(Component.literal(kind.title + " is STAGGERED! (+30% damage taken)").withStyle(ChatFormatting.YELLOW), true);
+                }
+            }
+        }
     }
 
     @Override
@@ -184,7 +302,11 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     public boolean canBeAffected(MobEffectInstance e) {
         var eff = e.getEffect();
         if (eff == ModEffects.FROZEN.get() || eff == ModEffects.SHOCKED.get() || eff == ModEffects.FEARED.get()
-                || eff == ModEffects.DISORIENTED.get()) return false;
+                || eff == ModEffects.DISORIENTED.get()) {
+            if (!level().isClientSide) addStagger(eff == ModEffects.FROZEN.get() ? 10 : 5);
+            return false;
+        }
+        if (eff == ModEffects.CONCUSSED.get() && !level().isClientSide) addStagger(3);
         if (eff == ModEffects.CHILLED.get() && e.getAmplifier() > 1) return false;
         return super.canBeAffected(e);
     }
@@ -207,8 +329,25 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
 
     protected void serverTick(ServerLevel level) {
         bossBar.setProgress(getHealth() / getMaxHealth());
+        staggerBar.setProgress(staggered() ? staggerTicks / 70f : stagger / 100f);
+        staggerBar.setName(Component.literal(staggered() ? "STAGGERED" : "Stagger"));
         if (isNoAi()) return;
         if (tickCount % 20 == 0) updateBossBarPlayers(level);
+        if (staggerImmune > 0) staggerImmune--;
+        if (staggerTicks > 0) {
+            staggerTicks--;
+            getNavigation().stop();
+            setDeltaMovement(getDeltaMovement().multiply(0.2, 1, 0.2));
+            if (tickCount % 10 == 0) Vfx.spray(level, FxStyle.STAR, position().add(0, getBbHeight() + 0.3, 0), 0xFFE060, 0xFFFFFF, 0.25f, 3, 0.1f, 0);
+            return;
+        }
+        if (tickCount - lastStaggerHit > 80 && stagger > 0) stagger = Math.max(0, stagger - 0.15f);
+        if (introTicks > 0) {
+            introTicks--;
+            getNavigation().stop();
+            introTick(level, introLength() - introTicks);
+            return;
+        }
         for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
         if (meleeCooldown > 0) meleeCooldown--;
         checkPhase(level);
@@ -237,6 +376,10 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
         }
         tickMovementAndMelee(level, core, distTarget, distCore);
         if (horizontalCollision && tickCount % 10 == 0) crushBlocks(level);
+    }
+
+    /** Called every tick of the entrance (t = 1..introLength). */
+    protected void introTick(ServerLevel level, int t) {
     }
 
     protected void startSkill(int id) {
@@ -343,11 +486,31 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
             SiegeDamage.push(e, position(), 0.9, 0.35);
             onMeleeHit(level, e);
         }
-        level.sendParticles(ParticleTypes.SWEEP_ATTACK, c.x, c.y, c.z, 3, 0.8, 0.3, 0.8, 0);
+        Vfx.slash(level, position().add(0, getBbHeight() * 0.5, 0), getYRot(), 15, 150, meleeReach(), dangerColor(), 0xFFFFFF, 9, 0.3f);
         Fx.sound(level, c, SoundEvents.PLAYER_ATTACK_SWEEP, 1.2f, 0.6f);
     }
 
     protected void onMeleeHit(ServerLevel level, LivingEntity e) {
+    }
+
+    @Override
+    public void awardKillScore(Entity killed, int score, DamageSource source) {
+        super.awardKillScore(killed, score, source);
+        if (killed instanceof Player || killed instanceof com.lastbastion.entity.hero.HeroEntity) speak(Lines.KILL, false);
+    }
+
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        if (staggered()) amount *= 1.3f;
+        boolean r = super.hurt(source, amount);
+        if (r && !level().isClientSide) {
+            float frac = amount / Math.max(1, getMaxHealth());
+            float add = frac * 220f;
+            if (source.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION)) add *= 1.5f;
+            if (amount > getMaxHealth() * 0.02f) add += 3;
+            addStagger(add);
+        }
+        return r;
     }
 
     /** Crush walls the boss walks into. */
@@ -398,8 +561,10 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     }
 
     protected void onPhase(ServerLevel level, int phase) {
-        Fx.shockwave(level, position(), 7, 0xFF2020);
+        Fx.shockwave(level, position(), 7, dangerColor());
+        Vfx.screenFlash(level, position(), dangerColor(), 0.2f, 60, 10);
         Fx.sound(level, position(), SoundEvents.ENDER_DRAGON_GROWL, 2f, 0.7f);
+        speak(Lines.PHASE, true);
         for (ServerPlayer p : level.players()) {
             if (p.distanceToSqr(this) < 80 * 80) {
                 p.sendSystemMessage(Component.literal(kind.title + " " + phaseLine(phase)).withStyle(ChatFormatting.DARK_RED, ChatFormatting.ITALIC));
@@ -439,8 +604,13 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     private void updateBossBarPlayers(ServerLevel level) {
         for (ServerPlayer p : level.players()) {
             boolean near = p.distanceToSqr(this) < 96 * 96;
-            if (near && !bossBar.getPlayers().contains(p)) bossBar.addPlayer(p);
-            else if (!near && bossBar.getPlayers().contains(p)) bossBar.removePlayer(p);
+            if (near && !bossBar.getPlayers().contains(p)) {
+                bossBar.addPlayer(p);
+                staggerBar.addPlayer(p);
+            } else if (!near && bossBar.getPlayers().contains(p)) {
+                bossBar.removePlayer(p);
+                staggerBar.removePlayer(p);
+            }
         }
     }
 
@@ -448,20 +618,44 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     public void stopSeenByPlayer(ServerPlayer player) {
         super.stopSeenByPlayer(player);
         bossBar.removePlayer(player);
+        staggerBar.removePlayer(player);
     }
 
     @Override
     public void remove(RemovalReason reason) {
         bossBar.removeAllPlayers();
+        staggerBar.removeAllPlayers();
         super.remove(reason);
+    }
+
+    /** Bosses take two and a half seconds to die, wracked by bursts of their own energy. */
+    @Override
+    protected void tickDeath() {
+        ++deathTime;
+        if (level() instanceof ServerLevel sl) {
+            if (deathTime % 8 == 1) {
+                Vec3 at = position().add((random.nextDouble() - 0.5) * getBbWidth(), random.nextDouble() * getBbHeight(), (random.nextDouble() - 0.5) * getBbWidth());
+                Vfx.flash(sl, at, dangerColor(), 1.4f, 6);
+                Vfx.spray(sl, FxStyle.SPARK, at, 0xFFFFFF, dangerColor(), 0.15f, 10, 0.4f, 0.3f);
+                Fx.sound(sl, at, SoundEvents.GENERIC_EXPLODE, 0.8f, 1.2f + random.nextFloat() * 0.3f);
+            }
+            if (deathTime >= 50 && !isRemoved()) {
+                Fx.explosion(sl, position().add(0, 1, 0), 5);
+                Vfx.pillar(sl, position(), 0xFFD966, getBbWidth(), 40, 40);
+                Vfx.screenFlash(sl, position(), 0xFFF4D0, 0.35f, 80, 12);
+                Vfx.spray(sl, FxStyle.SOUL, position().add(0, 1, 0), 0xFFFFFF, dangerColor(), 0.5f, 40, 0.3f, 1);
+                level().broadcastEntityEvent(this, (byte) 60);
+                remove(RemovalReason.KILLED);
+            }
+        }
     }
 
     @Override
     public void die(DamageSource source) {
         if (level() instanceof ServerLevel sl) {
-            Fx.explosion(sl, position().add(0, 1, 0), 5);
-            Fx.skyBeam(sl, position(), 0xFFD966, 40, 2);
-            sl.sendParticles(ParticleTypes.SOUL, getX(), getY() + 1, getZ(), 80, 1.5, 1.5, 1.5, 0.08);
+            speak(Lines.DEATH, true);
+            skill = 0;
+            anim.play(ANIM_INTRO + 1);
             for (ServerPlayer p : sl.players()) {
                 if (p.distanceToSqr(this) < 128 * 128) {
                     SiegeManager.title(p, Component.literal(kind.title).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
@@ -470,6 +664,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
             }
         }
         bossBar.removeAllPlayers();
+        staggerBar.removeAllPlayers();
         super.die(source);
     }
 

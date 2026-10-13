@@ -44,6 +44,7 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
     @Nullable
     private Function<T, Float> glowAlpha;
     private final float[] rgba = new float[4];
+    private float flip = 90f;
 
     public ProcRenderer(EntityRendererProvider.Context ctx, ModelSpec.Baked baked, ProcModel.Animator<T> animator, float shadow) {
         this(ctx, baked, animator, shadow, false);
@@ -84,6 +85,17 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
     public ProcRenderer<T> glowAlpha(Function<T, Float> f) {
         this.glowAlpha = f;
         return this;
+    }
+
+    /** Disable the vanilla sideways death topple (for models with their own death animation). */
+    public ProcRenderer<T> noDeathFlip() {
+        this.flip = 0f;
+        return this;
+    }
+
+    @Override
+    protected float getFlipDegrees(T entity) {
+        return flip;
     }
 
     public ProcRenderer<T> layer(RenderLayer<T, ProcModel<T>> layer) {
