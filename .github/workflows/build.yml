@@ -19,10 +19,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Compile and package
-        run: ./gradlew build --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew build --console=plain 2>&1 | tee build.log
 
       - name: Server boot smoke test (registries + GameTests)
-        run: ./gradlew runGameTestServer --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 900 ./gradlew runGameTestServer --console=plain 2>&1 | tee gametest.log
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -30,3 +36,12 @@ jobs:
           name: lastbastion-jar
           path: build/libs/*.jar
           if-no-files-found: ignore
+
+      - name: Error summary
+        if: failure()
+        shell: bash
+        run: |
+          echo "===== COMPILE ERRORS ====="
+          grep -E "\.java:[0-9]+: error" -A 3 build.log | head -n 900 || true
+          echo "===== GAMETEST ERRORS ====="
+          grep -iE "exception|error|caused by|failed" gametest.log 2>/dev/null | grep -v "DEBUG" | head -n 200 || true
