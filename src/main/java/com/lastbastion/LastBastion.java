@@ -19,6 +19,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 @Mod(LastBastion.MODID)
 public class LastBastion {
     public static final String MODID = "lastbastion";
+    public static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
 
     public LastBastion() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();

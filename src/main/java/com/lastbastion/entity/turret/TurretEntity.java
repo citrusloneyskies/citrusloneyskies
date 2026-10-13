@@ -289,6 +289,7 @@ public class TurretEntity extends Mob implements SiegeAlly {
             return;
         }
         ServerLevel sl = (ServerLevel) level();
+        if (isNoAi()) return;
         yBodyRot = 0;
         setYRot(0);
         if (cooldown > 0) cooldown--;

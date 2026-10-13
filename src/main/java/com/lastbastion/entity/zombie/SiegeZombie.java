@@ -397,7 +397,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     public void aiStep() {
         super.aiStep();
         if (level() instanceof ServerLevel sl) {
-            serverTick(sl);
+            if (!isNoAi()) serverTick(sl);
         } else if (isRising()) {
             BlockState below = level().getBlockState(blockPosition().below());
             if (!below.isAir()) {
@@ -408,6 +408,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     }
 
     protected void serverTick(ServerLevel level) {
+        if (isNoAi()) return;
         if (riseLeft > 0) {
             riseLeft--;
             setDeltaMovement(0, Math.min(0, getDeltaMovement().y), 0);

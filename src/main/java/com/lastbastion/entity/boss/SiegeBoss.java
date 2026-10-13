@@ -202,11 +202,12 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     @Override
     public void aiStep() {
         super.aiStep();
-        if (level() instanceof ServerLevel sl && isAlive()) serverTick(sl);
+        if (level() instanceof ServerLevel sl && isAlive() && !isNoAi()) serverTick(sl);
     }
 
     protected void serverTick(ServerLevel level) {
         bossBar.setProgress(getHealth() / getMaxHealth());
+        if (isNoAi()) return;
         if (tickCount % 20 == 0) updateBossBarPlayers(level);
         for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
         if (meleeCooldown > 0) meleeCooldown--;

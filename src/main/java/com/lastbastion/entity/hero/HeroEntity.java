@@ -241,6 +241,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     }
 
     private void brain(ServerLevel level) {
+        if (isNoAi()) return;
         for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
         if (attackCooldown > 0) attackCooldown--;
         if (tickCount - lastDamaged > 100 && tickCount % 20 == 0 && getHealth() < getMaxHealth()) heal(getMaxHealth() * 0.02f);

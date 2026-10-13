@@ -45,3 +45,64 @@ jobs:
           grep -E "\.java:[0-9]+: error" -A 3 build.log | head -n 900 || true
           echo "===== GAMETEST ERRORS ====="
           grep -iE "exception|error|caused by|failed" gametest.log 2>/dev/null | grep -v "DEBUG" | head -n 200 || true
+
+  showcase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install virtual display
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb libgl1 libgl1-mesa-dri libglu1-mesa
+
+      - name: Run client showcase (spawns every model and screenshots it)
+        shell: bash
+        env:
+          LB_SHOWCASE: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          mkdir -p run
+          printf 'onboardAccessibility:false\nrenderDistance:8\nsimulationDistance:8\nguiScale:2\ntutorialStep:none\nskipMultiplayerWarning:true\njoinedFirstServer:true\nsoundCategory_master:0.0\nfov:0.25\n' > run/options.txt
+          timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClient --console=plain > client.log 2>&1 || echo "client exited with $?"
+          ls -la run/screenshots || true
+
+      - name: Client errors
+        if: always()
+        shell: bash
+        run: |
+          grep -nE "Exception|ERROR|FATAL|Caused by|\[Showcase\]" client.log | grep -v "OpenAL\|ALSA\|sound" | head -n 120 || true
+          tail -n 30 client.log || true
+
+      - name: Screenshot thumbnails (base64 in log)
+        if: always()
+        shell: bash
+        run: |
+          pip install -q pillow
+          python3 - <<'PY'
+          import base64, glob, io, os
+          from PIL import Image
+          for f in sorted(glob.glob('run/screenshots/*.png')):
+              im = Image.open(f).convert('RGB')
+              im.thumbnail((640, 360))
+              buf = io.BytesIO()
+              im.save(buf, 'JPEG', quality=60)
+              b = base64.b64encode(buf.getvalue()).decode()
+              print('=====IMG ' + os.path.basename(f) + ' =====')
+              for i in range(0, len(b), 4000):
+                  print(b[i:i + 4000])
+              print('=====END=====')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: showcase-screenshots
+          path: run/screenshots/*.png
+          if-no-files-found: ignore
