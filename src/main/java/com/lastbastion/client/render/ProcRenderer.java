@@ -15,7 +15,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Mob;
 
 import javax.annotation.Nullable;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
 
@@ -24,6 +23,10 @@ import java.util.function.ToIntFunction;
  * translucency, pre-transforms (e.g. rising out of the ground) and a full-bright emissive layer.
  */
 public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
+    public interface Pre<T> {
+        void apply(T entity, PoseStack pose, float pt);
+    }
+
     public interface Tint<T> {
         /** Fill rgba[0..3] for this entity (defaults are 1). */
         void apply(T entity, float[] rgba);
@@ -36,7 +39,7 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
     @Nullable
     private Tint<T> tint;
     @Nullable
-    private BiConsumer<T, PoseStack> pre;
+    private Pre<T> pre;
     private boolean translucent;
     @Nullable
     private Function<T, Float> glowAlpha;
@@ -73,7 +76,7 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
         return this;
     }
 
-    public ProcRenderer<T> pre(BiConsumer<T, PoseStack> p) {
+    public ProcRenderer<T> pre(Pre<T> p) {
         this.pre = p;
         return this;
     }
@@ -109,7 +112,7 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
         model.tintB = rgba[2];
         model.alpha = rgba[3];
         pose.pushPose();
-        if (pre != null) pre.accept(entity, pose);
+        if (pre != null) pre.apply(entity, pose, pt);
         super.render(entity, yaw, pt, pose, buffers, light);
         pose.popPose();
     }
