@@ -72,6 +72,7 @@ public final class SiegeGameTests {
             Vec3 p = ring(core, 4, i, TurretKind.values().length);
             t.moveTo(p.x, p.y, p.z);
             t.setTurretLevel(1 + i % 5);
+            t.setBranch(1 + i % 2);
             level.addFreshEntity(t);
         }
         for (int i = 0; i < HeroKind.values().length; i++) {
@@ -92,6 +93,30 @@ public final class SiegeGameTests {
             SiegeBoss.spawn(level, BossKind.values()[i], ring(core, 14, i, BossKind.values().length), 5 + i * 5, 1);
         }
         h.runAfterDelay(380, () -> {
+            teardown(h, core);
+            h.succeed();
+        });
+    }
+
+    /** Every level-5 specialisation fires (charged specials included) against a mixed group without errors. */
+    @GameTest(template = "arena", timeoutTicks = 460, batch = "siege_specs")
+    public static void turretSpecialisations(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        TurretKind[] kinds = TurretKind.values();
+        for (int i = 0; i < kinds.length * 2; i++) {
+            TurretEntity t = kinds[i / 2].type().get().create(level);
+            Vec3 p = ring(core, 5, i, kinds.length * 2);
+            t.moveTo(p.x, p.y, p.z);
+            t.setTurretLevel(5);
+            t.setBranch(1 + i % 2);
+            level.addFreshEntity(t);
+        }
+        for (int i = 0; i < 16; i++) {
+            ZombieKind k = ZombieKind.values()[i % ZombieKind.values().length];
+            ZombieSpawner.spawn(level, k, ZombieRank.byId(2 + i % 3), 0, ring(core, 13, i, 16), false, true);
+        }
+        h.runAfterDelay(440, () -> {
             teardown(h, core);
             h.succeed();
         });

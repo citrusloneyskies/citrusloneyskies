@@ -66,6 +66,45 @@ public final class MiscModels {
                 }
                 case WIND_BLADE -> p.box(-4, -0.25f, -1, 8, 0.5f, 2, Paint.glowing(0xCFFFF0));
                 case SHADOW_ORB -> p.box(-2, -2, -2, 4, 4, 4, Paint.glowing(0x7A3AAA));
+                case HARPOON -> {
+                    p.box(-0.7f, -0.7f, -9, 1.4f, 1.4f, 16, Paint.of(Paint.Mat.DARK_METAL, 0x4A4C52));
+                    p.spike(0, 0, -9, 2.6f, 4, 90, 0, 0, Paint.of(Paint.Mat.METAL, 0xC8CCD4).gloss(0.6f));
+                    p.spike(0, 0, -7.5f, 0.9f, 2.4f, -135, 0, 0, Paint.of(Paint.Mat.METAL, 0xC8CCD4));
+                    p.spike(0, 0, -7.5f, 0.9f, 2.4f, 135, 0, 0, Paint.of(Paint.Mat.METAL, 0xC8CCD4));
+                    p.box(-0.4f, -0.4f, 7, 0.8f, 0.8f, 4, Paint.of(Paint.Mat.METAL, 0x6A6C72).pattern(Pattern.CHAINMAIL, 0xA0A4AA, 2f));
+                }
+                case NAPALM -> {
+                    p.octoZ(0, 0, -3, 3.4f, 6, Paint.of(Paint.Mat.METAL, 0xD07020).pattern(Pattern.HAZARD, 0x2A2A2A, 1.4f));
+                    p.box(-1, -1, -3.6f, 2, 2, 0.8f, Paint.glowing(0xFF8A20));
+                    p.box(-2, -0.2f, 2.4f, 4, 0.4f, 1.6f, Paint.of(0x3A3A3A)).box(-0.2f, -2, 2.4f, 0.4f, 4, 1.6f, Paint.of(0x3A3A3A));
+                }
+                case SPORE -> {
+                    p.sphere(0, 0, 0, 2, Paint.of(Paint.Mat.FLESH, 0x7A9A3A).pattern(Pattern.VEINS, 0xC8FF60).accentGlow());
+                    p.box(-0.8f, -0.8f, -2.4f, 1.6f, 1.6f, 0.6f, Paint.glowing(0xC8FF60));
+                }
+                case GRAND_SHELL -> {
+                    p.octoZ(0, 0, -4, 5, 9, Paint.of(Paint.Mat.DARK_METAL, 0x34363C).pattern(Pattern.BANDS, 0xB8903A, 0.6f));
+                    p.taper(0, 0, -4, 4, 4, 1, 1, 3, 3, Paint.of(Paint.Mat.METAL, 0x4A4C52));
+                    p.sub(0, 0, -4).rot(90, 0, 0).taper(0, 0, 0, 4.4f, 4.4f, 1.2f, 1.2f, 3.6f, 3, Paint.of(Paint.Mat.METAL, 0x4A4C52));
+                    p.box(-1.2f, -1.2f, 5, 2.4f, 2.4f, 0.6f, Paint.glowing(0xFF6020));
+                }
+                case ICE_SPEAR -> {
+                    p.sub(0, 0, 0).rot(90, 0, 0).taper(0, 4, 0, 2.6f, 2.6f, 0.4f, 0.4f, 12, 4, Paint.of(Paint.Mat.CRYSTAL, 0xA8E8FF).accent(0xFFFFFF).glow());
+                }
+                case BONE_SHARD -> p.sub(0, 0, 0).rot(90, 0, 0).taper(0, 2, 0, 1.6f, 1.6f, 0.3f, 0.3f, 5, 3, Paint.of(Paint.Mat.BONE, 0xE8E0D0));
+                case BLOOD_ORB -> {
+                    p.sphere(0, 0, 0, 1.8f, Paint.glowing(0xB01020).pattern(Pattern.VEINS, 0xFF6060));
+                }
+                case STAR_ARROW -> {
+                    p.box(-0.4f, -0.4f, -7, 0.8f, 0.8f, 14, Paint.glowing(0xFFF0A0));
+                    p.spike(0, 0, -7, 1.6f, 2.4f, 90, 0, 0, Paint.glowing(0xFFFFFF));
+                    p.box(-1.6f, -0.1f, 4, 3.2f, 0.2f, 2.4f, Paint.glowing(0xFFE070)).box(-0.1f, -1.6f, 4, 0.2f, 3.2f, 2.4f, Paint.glowing(0xFFE070));
+                }
+                case SAND_ORB -> p.sphere(0, 0, 0, 2, Paint.of(Paint.Mat.STONE, 0xE8C878).accent(0xB8985A).glow());
+                case PLASMA -> {
+                    p.sphere(0, 0, 0, 1.6f, Paint.glowing(0x40E0FF));
+                    p.box(-0.6f, -0.6f, 0, 1.2f, 1.2f, 4, Paint.glowing(0xA0F0FF));
+                }
             }
         }
         projectiles = s.bake();

@@ -47,6 +47,8 @@ public final class VfxManager {
         switch (p.kind()) {
             case SHAKE -> CameraShake.add(new Vec3(p.x(), p.y(), p.z()), p.size(), p.extra(), p.life());
             case SCREEN_FLASH -> ScreenFlash.add(new Vec3(p.x(), p.y(), p.z()), p.color(), p.size(), p.extra(), p.life());
+            case JET -> Emitters.jet(p);
+            case SPRAY -> Emitters.spray(p);
             default -> {
                 if (ACTIVE.size() > 900) ACTIVE.remove(0);
                 ACTIVE.add(new Effect(p, seeds++ * 0x9E3779B97F4A7C15L));
@@ -525,7 +527,8 @@ public final class VfxManager {
     private static void tether(Draw d, Effect fx, float pt) {
         float t = t(fx, pt);
         float fade = Math.min(1, (1 - t) * 4);
-        Vec3 from = entityPos(fx.p.ent1(), pt, a(fx), true), to = entityPos(fx.p.ent2(), pt, b(fx), true);
+        Vec3 from = fx.p.extra() > 0 ? entityPos(fx.p.ent1(), pt, a(fx), false).add(0, fx.p.extra(), 0) : entityPos(fx.p.ent1(), pt, a(fx), true);
+        Vec3 to = entityPos(fx.p.ent2(), pt, b(fx), true);
         float time = clientTicks + pt;
         float w = fx.p.size();
         Vector3f prev = d.rel(from);

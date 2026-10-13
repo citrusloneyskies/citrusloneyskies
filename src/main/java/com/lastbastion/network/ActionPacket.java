@@ -58,7 +58,7 @@ public record ActionPacket(int action, int target, String id) {
                     return;
                 }
                 switch (action) {
-                    case TURRET_UPGRADE -> t.upgrade(p);
+                    case TURRET_UPGRADE -> t.upgrade(p, id);
                     case TURRET_SELL -> t.sell(p);
                     case TURRET_REPAIR -> t.repair(p);
                     default -> t.cycleMode();

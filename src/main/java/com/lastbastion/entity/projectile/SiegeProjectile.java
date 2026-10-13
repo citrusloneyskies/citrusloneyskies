@@ -278,7 +278,17 @@ public class SiegeProjectile extends Projectile {
         JAVELIN(0.0f, 0xF4F06A, 4),
         HOOK(0.0f, 0x6A6A6A, 1),
         WIND_BLADE(0.0f, 0xCFFFF0, 2),
-        SHADOW_ORB(0.0f, 0x5A2A7A, 3);
+        SHADOW_ORB(0.0f, 0x5A2A7A, 3),
+        HARPOON(0.0f, 0x4A4C52, 1),
+        NAPALM(0.05f, 0xD07020, 2),
+        SPORE(0.0f, 0x9BD940, 2),
+        GRAND_SHELL(0.05f, 0x30333A, 3),
+        ICE_SPEAR(0.0f, 0xBFF4FF, 3),
+        BONE_SHARD(0.02f, 0xE8E0D0, 1),
+        BLOOD_ORB(0.0f, 0xB01020, 3),
+        STAR_ARROW(0.0f, 0xFFF0A0, 3),
+        SAND_ORB(0.0f, 0xE8C878, 3),
+        PLASMA(0.0f, 0x40E0FF, 3);
 
         public final float gravity;
         public final int color;
@@ -309,7 +319,16 @@ public class SiegeProjectile extends Projectile {
                 case WIND_BLADE -> ParticleTypes.CLOUD;
                 case SHADOW_ORB -> ParticleTypes.SQUID_INK;
                 case BOULDER -> ParticleTypes.ASH;
-                case ARROW, BOLT -> ParticleTypes.CRIT;
+                case ARROW, BOLT, HARPOON -> ParticleTypes.CRIT;
+                case NAPALM -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.FLAME, 0xFF8A20, 0.35f, 10);
+                case SPORE -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.GLOW, 0xB8F060, 0.3f, 12);
+                case GRAND_SHELL -> ParticleTypes.LARGE_SMOKE;
+                case ICE_SPEAR -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.FLAKE, 0xD8F8FF, 0.22f, 16);
+                case BONE_SHARD -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.DEBRIS, 0xE8E0D0, 0.12f, 10);
+                case BLOOD_ORB -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.GLOW, 0xC01020, 0.4f, 10);
+                case STAR_ARROW -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.STAR, 0xFFF0A0, 0.25f, 14);
+                case SAND_ORB -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.SMOKE, 0xE8C878, 0.4f, 16);
+                case PLASMA -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.GLOW, 0x40E0FF, 0.35f, 8);
                 default -> null;
             };
         }
@@ -321,6 +340,10 @@ public class SiegeProjectile extends Projectile {
                 case ROCKET, MISSILE -> ParticleTypes.FLAME;
                 case HOLY_BOLT, JAVELIN -> Fx.dust(color, 1.2f);
                 case ARCANE_BOLT -> Fx.dust(color, 1.0f);
+                case NAPALM, GRAND_SHELL -> ParticleTypes.SMOKE;
+                case SPORE -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.SMOKE, 0x6A8A3A, 0.4f, 20);
+                case BLOOD_ORB -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.DROP, 0x8A0A14, 0.12f, 18);
+                case PLASMA -> com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.SPARK, 0xA0F0FF, 0.1f, 8);
                 default -> null;
             };
         }
@@ -328,35 +351,65 @@ public class SiegeProjectile extends Projectile {
         public void impactFx(ServerLevel level, Vec3 at, float aoe) {
             switch (this) {
                 case MORTAR_SHELL, ROCKET, MISSILE, METEOR, GRENADE -> Fx.explosion(level, at, Math.max(1.5, aoe));
-                case FROST_SHARD -> {
-                    level.sendParticles(ParticleTypes.ITEM_SNOWBALL, at.x, at.y, at.z, 10, 0.2, 0.2, 0.2, 0.1);
+                case GRAND_SHELL -> {
+                    Fx.explosion(level, at, Math.max(3, aoe));
+                    com.lastbastion.fx.Vfx.ring(level, at, 0xFFE0B0, aoe * 2.2f, 16, 1.4f);
+                    com.lastbastion.fx.Vfx.screenFlash(level, at, 0xFFE8C0, 0.25f, 24, 6);
+                }
+                case NAPALM -> {
+                    Fx.explosion(level, at, 1.5);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.FLAME, at, 0xFFC040, 0xFF3010, 0.6f, 24, 0.35f, 0.6f);
+                }
+                case FROST_SHARD, ICE_SPEAR -> {
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SHARD, at, 0xD8F8FF, 0x8FE3FF, 0.18f, this == ICE_SPEAR ? 18 : 9, 0.3f, 0.3f);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.FLAKE, at, 0xFFFFFF, 0xBFF4FF, 0.15f, 6, 0.12f, 0f);
                     Fx.sound(level, at, SoundEvents.GLASS_BREAK, 0.4f, 1.6f);
                 }
                 case WATER_ORB -> {
                     level.sendParticles(ParticleTypes.SPLASH, at.x, at.y, at.z, 25, 0.4, 0.2, 0.4, 0.2);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.DROP, at, 0x8AC8FF, 0x2F6BFF, 0.14f, 16, 0.3f, 0.8f);
+                    com.lastbastion.fx.Vfx.ring(level, at.add(0, -0.4, 0), 0x6AB0FF, Math.max(1.2f, aoe), 10, 0.4f);
                     Fx.sound(level, at, SoundEvents.GENERIC_SPLASH, 0.5f, 1.2f);
                 }
-                case ACID_GLOB, BILE -> {
-                    level.sendParticles(Fx.dust(color, 1.5f), at.x, at.y, at.z, 20, Math.max(0.3, aoe * 0.4), 0.2, Math.max(0.3, aoe * 0.4), 0);
+                case ACID_GLOB, BILE, SPORE -> {
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.DROP, at, 0xC8FF60, 0x5A9A20, 0.16f, 16, 0.3f, 0.7f);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SMOKE, at, 0x9BD940, 0x4A6A20, 0.8f, 6, 0.08f, 0.5f);
                     Fx.sound(level, at, SoundEvents.SLIME_SQUISH, 0.6f, 0.8f);
                 }
-                case HOLY_BOLT -> level.sendParticles(ParticleTypes.END_ROD, at.x, at.y, at.z, 12, 0.2, 0.2, 0.2, 0.1);
-                case ARCANE_BOLT, SHADOW_ORB -> level.sendParticles(ParticleTypes.WITCH, at.x, at.y, at.z, 15, 0.3, 0.3, 0.3, 0.1);
+                case HOLY_BOLT, STAR_ARROW -> {
+                    com.lastbastion.fx.Vfx.flash(level, at, 0xFFE8A0, 0.8f, 5);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.STAR, at, 0xFFFFFF, 0xFFE08A, 0.2f, 10, 0.25f, 0.2f);
+                }
+                case ARCANE_BOLT, SHADOW_ORB -> {
+                    com.lastbastion.fx.Vfx.flash(level, at, color, 0.7f, 5);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.GLOW, at, color, 0xFFFFFF, 0.25f, 12, 0.25f, 0f);
+                }
                 case FIREBALL -> {
-                    level.sendParticles(ParticleTypes.FLAME, at.x, at.y, at.z, 20, 0.4, 0.4, 0.4, 0.05);
+                    com.lastbastion.fx.Vfx.flash(level, at, 0xFF9A30, 1.1f, 6);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.FLAME, at, 0xFFD060, 0xFF4010, 0.45f, 18, 0.3f, 0.2f);
                     Fx.sound(level, at, SoundEvents.BLAZE_SHOOT, 0.5f, 0.7f);
                 }
-                case SOUL_BOLT -> level.sendParticles(ParticleTypes.SOUL, at.x, at.y, at.z, 10, 0.3, 0.3, 0.3, 0.05);
+                case SOUL_BOLT -> com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SOUL, at, 0x5AD8FF, 0xC0F4FF, 0.3f, 8, 0.12f, 0.8f);
                 case JAVELIN -> {
-                    Fx.bolt(level, at.add(0, 12, 0), at, 0xF4F06A, 1.3f);
+                    com.lastbastion.fx.Vfx.lightning(level, at, 0xF4F06A, 1f);
                     Fx.sound(level, at, SoundEvents.LIGHTNING_BOLT_IMPACT, 1f, 1.2f);
                 }
                 case BOULDER -> {
-                    level.sendParticles(ParticleTypes.EXPLOSION, at.x, at.y, at.z, 1, 0, 0, 0, 0);
-                    level.sendParticles(ParticleTypes.CLOUD, at.x, at.y, at.z, 20, 1, 0.3, 1, 0.05);
+                    Fx.shockwave(level, at, Math.max(2, aoe), 0xB0A890);
                     Fx.sound(level, at, SoundEvents.STONE_BREAK, 1.5f, 0.5f);
                 }
-                case WIND_BLADE -> level.sendParticles(ParticleTypes.CLOUD, at.x, at.y, at.z, 10, 0.3, 0.3, 0.3, 0.1);
+                case WIND_BLADE -> com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.LEAF, at, 0xE8FFF8, 0x9FFFE8, 0.2f, 8, 0.3f, 0.2f);
+                case BLOOD_ORB -> {
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.DROP, at, 0xC01020, 0x5A0008, 0.15f, 14, 0.3f, 0.5f);
+                    com.lastbastion.fx.Vfx.flash(level, at, 0xC01020, 0.6f, 4);
+                }
+                case SAND_ORB -> com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SMOKE, at, 0xE8C878, 0xB8985A, 0.8f, 12, 0.2f, 0.2f);
+                case PLASMA -> {
+                    com.lastbastion.fx.Vfx.flash(level, at, 0x40E0FF, 0.9f, 5);
+                    com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SPARK, at, 0xFFFFFF, 0x40E0FF, 0.12f, 12, 0.5f, 0.2f);
+                }
+                case BONE_SHARD -> com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.DEBRIS, at, 0xE8E0D0, 0xA89A80, 0.12f, 6, 0.25f, 0.4f);
+                case HARPOON, BOLT, ARROW -> com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SPARK, at, 0xFFE8C0, 0xC8A060, 0.08f, 5, 0.3f, 0.3f);
                 default -> level.sendParticles(ParticleTypes.CRIT, at.x, at.y, at.z, 6, 0.1, 0.1, 0.1, 0.2);
             }
         }

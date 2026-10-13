@@ -118,6 +118,26 @@ public final class Vfx {
         send(l, VfxKind.TETHER, a.position(), b.position(), color, 0xFFFFFF, width, 0, life, a.getId(), b.getId());
     }
 
+    /** Attached beam whose origin sits {@code originHeight} blocks above {@code a}'s feet (turret emitters, staffs). */
+    public static void tether(ServerLevel l, Entity a, float originHeight, Entity b, int color, float width, int life) {
+        send(l, VfxKind.TETHER, a.position(), b.position(), color, 0xFFFFFF, width, originHeight, life, a.getId(), b.getId());
+    }
+
+    /**
+     * Directed particle jet (flamethrowers, breath, sprays) built client-side: {@code count} particles stream
+     * from {@code from} toward {@code to} inside a cone of {@code spreadDeg}, coloured from {@code c0} to {@code c1}.
+     */
+    public static void jet(ServerLevel l, FxStyle style, Vec3 from, Vec3 to, int c0, int c1, float size, int count, float spreadDeg) {
+        send(l, VfxKind.JET, from, to, c0, c1, size, spreadDeg, Math.max(1, count), style.ordinal(), -1);
+    }
+
+    /**
+     * Omni-directional particle spray built client-side. {@code upBias} 0 = sphere, 1 = fountain, -1 = flat ring.
+     */
+    public static void spray(ServerLevel l, FxStyle style, Vec3 at, int c0, int c1, float size, int count, float speed, float upBias) {
+        send(l, VfxKind.SPRAY, at, new Vec3(speed, upBias, 0), c0, c1, size, 0, Math.max(1, count), style.ordinal(), -1);
+    }
+
     /** Wall of energy/water sweeping from {@code from} to {@code to}. */
     public static void wave(ServerLevel l, Vec3 from, Vec3 to, int color, float width, float height, int life) {
         send(l, VfxKind.WAVE, from, to, color, 0xFFFFFF, width, height, life);

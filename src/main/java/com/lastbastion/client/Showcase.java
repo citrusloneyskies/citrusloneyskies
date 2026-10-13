@@ -11,6 +11,8 @@ import com.lastbastion.entity.zombie.SiegeZombie;
 import com.lastbastion.entity.zombie.ZombieKind;
 import com.lastbastion.entity.zombie.ZombieRank;
 import com.lastbastion.entity.zombie.ZombieSpawner;
+import com.lastbastion.fx.FxStyle;
+import com.lastbastion.fx.Vfx;
 import com.lastbastion.registry.ModBlocks;
 import com.lastbastion.siege.SiegeManager;
 import net.minecraft.client.Minecraft;
@@ -22,6 +24,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.GameRules;
@@ -41,38 +44,70 @@ import java.util.List;
 
 /**
  * Developer showcase, enabled with the environment variable {@code LB_SHOWCASE=1}. Creates a flat
- * creative world, lines up every zombie (rank I and V), hero, turret (Lv1 and Lv5) and boss, takes
- * screenshots from preset camera positions, then lets a real wave play out and photographs the
- * battle before quitting. Used by CI to visually verify the procedural models.
+ * creative world, poses every zombie (rank I and V), hero, turret (Lv1, Lv3 and both Lv5
+ * specialisations) and boss, plus a row of test visual effects, photographs each up close, then lets a
+ * real wave play out and photographs the battle before quitting. Used by CI to check the models.
  */
 @Mod.EventBusSubscriber(modid = LastBastion.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class Showcase {
     private static final boolean ENABLED = System.getenv("LB_SHOWCASE") != null;
     private static int stage, ticks, shot;
     private static final int GROUND = -60;
+    static final double ZOMBIE_Z = 0, HERO_Z = 20, TURRET_Z = 40, BOSS_Z = 64, VFX_Z = -24;
+
     private record Shot(String name, Vec3 pos, float yaw, float pitch) {
     }
 
     private static final List<Shot> SHOTS = new ArrayList<>();
     private static final List<Mob> POSED = new ArrayList<>();
 
-    static {
-        double y = GROUND;
-        SHOTS.add(new Shot("01_zombies_rank1_a", new Vec3(6.6, y + 2.5, -9), 0, 10));
-        SHOTS.add(new Shot("02_zombies_rank1_b", new Vec3(19.8, y + 2.5, -9), 0, 10));
-        SHOTS.add(new Shot("03_zombies_rank5_a", new Vec3(6.6, y + 2.8, 5), 0, 10));
-        SHOTS.add(new Shot("04_zombies_rank5_b", new Vec3(19.8, y + 2.8, 5), 0, 10));
-        SHOTS.add(new Shot("05_heroes_a", new Vec3(8.5, y + 3, 18), 0, 10));
-        SHOTS.add(new Shot("06_heroes_b", new Vec3(35, y + 5, 13), 0, 12));
-        SHOTS.add(new Shot("07_turrets_a", new Vec3(5, y + 2.4, 39), 0, 14));
-        SHOTS.add(new Shot("08_turrets_b", new Vec3(17.5, y + 2.4, 39), 0, 14));
-        SHOTS.add(new Shot("09_bosses_a", new Vec3(7, y + 5, 58), 0, 10));
-        SHOTS.add(new Shot("10_bosses_b", new Vec3(35, y + 7, 55), 0, 12));
-        SHOTS.add(new Shot("11_bosses_c", new Vec3(63, y + 6, 58), 0, 8));
-        SHOTS.add(new Shot("12_core", new Vec3(-10, y + 2.2, -5), 0, 12));
+    private Showcase() {
     }
 
-    private Showcase() {
+    static double zombieX(int i) {
+        return i * 5.0;
+    }
+
+    static double heroX(int i) {
+        return i * 7.0;
+    }
+
+    static double turretX(int i) {
+        return i * 11.0;
+    }
+
+    static double bossX(int i) {
+        return i * 18.0;
+    }
+
+    private static void planShots() {
+        SHOTS.clear();
+        int n = 1;
+        double y = GROUND;
+        SHOTS.add(new Shot(String.format("%02d_vfx", n++), new Vec3(12, y + 6, VFX_Z - 15), 0, 16));
+        SHOTS.add(new Shot(String.format("%02d_core", n++), new Vec3(-10, y + 2.4, -5.2), 0, 14));
+        ZombieKind[] zk = ZombieKind.values();
+        for (int i = 0; i < zk.length; i += 2) {
+            double cx = (zombieX(i) + zombieX(Math.min(zk.length - 1, i + 1)) + 1.8) / 2;
+            String label = zk[i].name().toLowerCase() + (i + 1 < zk.length ? "_" + zk[i + 1].name().toLowerCase() : "");
+            SHOTS.add(new Shot(String.format("%02d_zombies_%s", n++, label), new Vec3(cx, y + 1.9, ZOMBIE_Z - 5.4), 0, 12));
+        }
+        HeroKind[] hk = HeroKind.values();
+        for (int i = 0; i < hk.length; i++) {
+            EntityDimensions d = hk[i].type().get().getDimensions();
+            double dist = Math.max(3.4, d.height * 1.55 + d.width);
+            SHOTS.add(new Shot(String.format("%02d_hero_%s", n++, hk[i].name().toLowerCase()), new Vec3(heroX(i), y + d.height * 0.62 + 0.3, HERO_Z - dist), 0, 10));
+        }
+        TurretKind[] tk = TurretKind.values();
+        for (int i = 0; i < tk.length; i++) {
+            SHOTS.add(new Shot(String.format("%02d_turret_%s", n++, tk[i].id), new Vec3(turretX(i) + 3.9, y + 2.6, TURRET_Z - 6.8), 0, 15));
+        }
+        BossKind[] bk = BossKind.values();
+        for (int i = 0; i < bk.length; i++) {
+            EntityDimensions d = bk[i].type().get().getDimensions();
+            double dist = Math.max(6, d.height * 1.7 + d.width);
+            SHOTS.add(new Shot(String.format("%02d_boss_%s", n++, bk[i].name().toLowerCase()), new Vec3(bossX(i), y + d.height * 0.6 + 0.5, BOSS_Z - dist), 0, 10));
+        }
     }
 
     @SubscribeEvent
@@ -90,6 +125,7 @@ public final class Showcase {
             }
             case 1 -> {
                 if (mc.level != null && mc.player != null && ticks > 60) {
+                    planShots();
                     MinecraftServer server = mc.getSingleplayerServer();
                     if (server != null) server.execute(() -> buildScene(server));
                     mc.options.hideGui = true;
@@ -98,7 +134,7 @@ public final class Showcase {
                 }
             }
             case 2 -> {
-                if (ticks > 80) {
+                if (ticks > 90) {
                     stage = 3;
                     ticks = 0;
                     shot = 0;
@@ -106,26 +142,32 @@ public final class Showcase {
                 }
             }
             case 3 -> {
-                if (ticks == 50) {
+                if (ticks == 6 && SHOTS.get(shot).name().endsWith("_vfx")) {
+                    MinecraftServer server = mc.getSingleplayerServer();
+                    if (server != null) server.execute(() -> vfxRow(server.overworld()));
+                }
+                if (ticks == 45) {
                     grab(mc, SHOTS.get(shot).name());
-                } else if (ticks > 55) {
+                } else if (ticks > 48) {
                     shot++;
                     ticks = 0;
                     if (shot >= SHOTS.size()) {
                         stage = 4;
                         MinecraftServer server = mc.getSingleplayerServer();
                         if (server != null) server.execute(() -> startBattle(server));
-                        moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 18, -28), 0, 28));
+                        moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 12, -20), 0, 30));
                     } else {
                         moveTo(mc, SHOTS.get(shot));
                     }
                 }
             }
             case 4 -> {
-                if (ticks == 200) grab(mc, "13_battle_a");
-                if (ticks == 400) grab(mc, "14_battle_b");
-                if (ticks == 401) moveTo(mc, new Shot("battle2", new Vec3(-26, GROUND + 5, 0), -90, 10));
-                if (ticks == 520) grab(mc, "15_battle_c");
+                if (ticks == 160) grab(mc, "90_battle_a");
+                if (ticks == 300) grab(mc, "91_battle_b");
+                if (ticks == 301) moveTo(mc, new Shot("battle2", new Vec3(-22, GROUND + 4, 0), -90, 12));
+                if (ticks == 420) grab(mc, "92_battle_c");
+                if (ticks == 421) moveTo(mc, new Shot("battle3", new Vec3(-10, GROUND + 3, -12), 0, 8));
+                if (ticks == 520) grab(mc, "93_battle_d");
                 if (ticks == 530) {
                     LastBastion.LOGGER.info("[Showcase] complete");
                     mc.stop();
@@ -165,47 +207,70 @@ public final class Showcase {
             p.getAbilities().flying = true;
             p.onUpdateAbilities();
         }
-        int i = 0;
-        for (ZombieKind k : ZombieKind.values()) {
-            double x = i * 2.4;
-            SiegeZombie z = ZombieSpawner.spawn(level, k, ZombieRank.ROTTEN, 0, new Vec3(x, GROUND, 0), false, false);
-            if (z != null) pose(z, level, x, GROUND, 0, false);
-            SiegeZombie z5 = ZombieSpawner.spawn(level, k, ZombieRank.ABYSSAL, i % 4 == 0 ? 1 << (i % 10) : 0, new Vec3(x, GROUND, 14), false, false);
-            if (z5 != null) pose(z5, level, x, GROUND, 14, false);
-            i++;
+        ZombieKind[] zk = ZombieKind.values();
+        for (int i = 0; i < zk.length; i++) {
+            double x = zombieX(i);
+            SiegeZombie z = ZombieSpawner.spawn(level, zk[i], ZombieRank.ROTTEN, 0, new Vec3(x, GROUND, ZOMBIE_Z), false, false);
+            if (z != null) pose(z, level, x, GROUND, ZOMBIE_Z, false);
+            SiegeZombie z5 = ZombieSpawner.spawn(level, zk[i], ZombieRank.ABYSSAL, i % 4 == 0 ? 1 << (i % 10) : 0, new Vec3(x + 1.8, GROUND, ZOMBIE_Z), false, false);
+            if (z5 != null) pose(z5, level, x + 1.8, GROUND, ZOMBIE_Z, false);
         }
-        double[] heroX = {0, 3.5, 7, 11, 14.5, 18, 24, 31, 38, 48};
-        i = 0;
-        for (HeroKind k : HeroKind.values()) {
-            HeroEntity h = k.type().get().create(level);
+        HeroKind[] hk = HeroKind.values();
+        for (int i = 0; i < hk.length; i++) {
+            HeroEntity h = hk[i].type().get().create(level);
             if (h == null) continue;
             h.finalizeSpawn(level, level.getCurrentDifficultyAt(BlockPos.ZERO), MobSpawnType.EVENT, null, null);
             h.setLevelAndXp(5, 700);
-            pose(h, level, heroX[i], GROUND + (k.flying ? 1.5 : 0), 28, true);
-            i++;
+            pose(h, level, heroX(i), GROUND, HERO_Z, true);
         }
-        i = 0;
-        for (TurretKind k : TurretKind.values()) {
-            TurretEntity t1 = k.type().get().create(level);
-            TurretEntity t5 = k.type().get().create(level);
-            if (t1 == null || t5 == null) continue;
-            t1.setTurretLevel(1);
-            t5.setTurretLevel(5);
-            pose(t1, level, i * 2.5, GROUND, 44, true);
-            pose(t5, level, i * 2.5, GROUND, 49, true);
-            i++;
+        TurretKind[] tk = TurretKind.values();
+        for (int i = 0; i < tk.length; i++) {
+            double x0 = turretX(i);
+            double[] xs = {x0, x0 + 2.4, x0 + 5.0, x0 + 7.9};
+            int[] lv = {1, 3, 5, 5};
+            int[] br = {0, 0, 1, 2};
+            for (int j = 0; j < 4; j++) {
+                TurretEntity t = tk[i].type().get().create(level);
+                if (t == null) continue;
+                t.setTurretLevel(lv[j]);
+                t.setBranch(br[j]);
+                pose(t, level, xs[j], GROUND, TURRET_Z, true);
+            }
         }
-        i = 0;
-        for (BossKind k : BossKind.values()) {
-            SiegeBoss b = k.type().get().create(level);
+        BossKind[] bk = BossKind.values();
+        for (int i = 0; i < bk.length; i++) {
+            SiegeBoss b = bk[i].type().get().create(level);
             if (b == null) continue;
             b.setHealth(b.getMaxHealth());
-            pose(b, level, i * 14, GROUND + (k == BossKind.MORVATHRAX ? 2 : 0), 72, true);
-            i++;
+            pose(b, level, bossX(i), GROUND, BOSS_Z, true);
         }
         BlockPos core = new BlockPos(-10, GROUND, 0);
         level.setBlock(core, ModBlocks.SIEGE_CORE.get().defaultBlockState(), 3);
         SiegeManager.tryPlaceCore(level, core, null);
+    }
+
+    /** A row of long-lived test effects so the VFX renderer can be checked in one picture. */
+    private static void vfxRow(ServerLevel l) {
+        double y = GROUND, z = VFX_Z;
+        int life = 200;
+        Vfx.beam(l, new Vec3(-2, y + 1.5, z), new Vec3(4, y + 1.5, z), 0xC86BFF, 0.3f, life);
+        Vfx.arc(l, new Vec3(-2, y + 4, z), new Vec3(4, y + 3, z), 0xF4F06A, 0.08f, life, 0.8f);
+        Vfx.slash(l, new Vec3(7, y + 1.5, z), 180, 0, 160, 2.2f, 0xFFE8A0, 0xFFFFFF, 30, 0.4f);
+        Vfx.slash(l, new Vec3(7, y + 2.5, z), 180, 80, 140, 1.6f, 0xFF4030, 0xFFE0C0, 30, 0.35f);
+        Vfx.pillar(l, new Vec3(11, y, z), 0xFFF2B0, 0.8f, 8, life);
+        Vfx.dome(l, new Vec3(15, y, z), 0x6FE3FF, 2.4f, life, null);
+        Vfx.vortex(l, new Vec3(20, y, z), 0xE8FFF8, 0x9FFFE8, 1.6f, 5, life, null);
+        Vfx.sigil(l, new Vec3(25, y + 0.02, z), 0xC86BFF, 2.4f, life, 1.5f);
+        Vfx.teleCircle(l, new Vec3(1, y + 0.02, z + 5), 2.5f, life, Vfx.DANGER, true);
+        Vfx.teleLine(l, new Vec3(6, y + 0.02, z + 3), new Vec3(10, y + 0.02, z + 9), 2f, life, Vfx.DANGER_DARK, true);
+        Vfx.teleCone(l, new Vec3(14, y + 0.02, z + 3), new Vec3(14, y, z + 9), 6, 30, life, 0xFF8A20, true);
+        Vfx.teleDonut(l, new Vec3(22, y + 0.02, z + 6), 1.5f, 3.5f, life, Vfx.DANGER, true);
+        Vfx.ring(l, new Vec3(28, y + 0.05, z + 4), 0xFFB040, 3, life, 1);
+        Vfx.flash(l, new Vec3(28, y + 2, z), 0xFFB040, 1.5f, life);
+        Vfx.wave(l, new Vec3(30, y, z - 2), new Vec3(30, y, z + 8), 0x2F7BFF, 4, 2.5f, life);
+        Vfx.spray(l, FxStyle.FLAME, new Vec3(-4, y + 1, z), 0xFFD060, 0xFF3010, 0.5f, 30, 0.1f, 1);
+        Vfx.spray(l, FxStyle.STAR, new Vec3(11, y + 3, z), 0xFFFFFF, 0xFFE08A, 0.3f, 20, 0.2f, 0);
+        Vfx.jet(l, FxStyle.FLAME, new Vec3(-4, y + 1, z + 6), new Vec3(-4, y + 1, z + 12), 0xFFE070, 0xFF3A08, 0.5f, 40, 12);
     }
 
     private static void startBattle(MinecraftServer server) {
@@ -216,23 +281,27 @@ public final class Showcase {
         for (Entity e : level.getAllEntities()) {
             if (e instanceof HeroEntity h) {
                 h.setNoAi(false);
-                h.teleportTo(-10 + level.random.nextGaussian() * 4, GROUND + (h.kind.flying ? 3 : 0), level.random.nextGaussian() * 4);
+                h.teleportTo(-10 + level.random.nextGaussian() * 4, GROUND, level.random.nextGaussian() * 4);
             }
         }
+        level.setDayTime(18000);
         BlockPos core = new BlockPos(-10, GROUND, 0);
-        for (int i = 0; i < TurretKind.values().length; i++) {
-            TurretEntity t = TurretKind.values()[i].type().get().create(level);
+        TurretKind[] tk = TurretKind.values();
+        for (int i = 0; i < tk.length; i++) {
+            TurretEntity t = tk[i].type().get().create(level);
             if (t == null) continue;
-            double a = Math.PI * 2 * i / TurretKind.values().length;
+            double a = Math.PI * 2 * i / tk.length;
             t.moveTo(core.getX() + 0.5 + Math.cos(a) * 6, GROUND, core.getZ() + 0.5 + Math.sin(a) * 6);
             t.setTurretLevel(3 + i % 3);
+            t.setBranch(1 + i % 2);
             level.addFreshEntity(t);
         }
         var d = SiegeManager.data(level);
         d.wave = 15;
         SiegeManager.startWave(level, d, false);
+        ZombieKind[] zk = ZombieKind.values();
         for (int i = 0; i < 24; i++) {
-            ZombieKind k = ZombieKind.values()[i % ZombieKind.values().length];
+            ZombieKind k = zk[i % zk.length];
             double a = Math.PI * 2 * i / 24;
             ZombieSpawner.spawn(level, k, ZombieRank.byId(i % 5), 0, new Vec3(core.getX() + Math.cos(a) * 16, GROUND, core.getZ() + Math.sin(a) * 16), true, true);
         }

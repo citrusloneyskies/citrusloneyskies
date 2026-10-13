@@ -174,8 +174,14 @@ public final class ModelSpec {
             return this;
         }
 
-        /** A tapered spike/horn pointing "up" in its own rotated frame. Returns the spike part. */
+        /** A tapered spike/horn pointing "up" (-Y) in its own rotated frame. Returns this part, so calls chain. */
         public Part spike(float x, float y, float z, float base, float length, float rotX, float rotY, float rotZ, Paint p) {
+            spikePart(x, y, z, base, length, rotX, rotY, rotZ, p);
+            return this;
+        }
+
+        /** Like {@link #spike} but returns the new spike part (to attach things to its tip). */
+        public Part spikePart(float x, float y, float z, float base, float length, float rotX, float rotY, float rotZ, Paint p) {
             Part s = sub(x, y, z).rot(rotX, rotY, rotZ);
             int steps = length > 6 ? 4 : 3;
             s.taper(0, 0, 0, base, base, base * 0.2f, base * 0.2f, length, steps, p);

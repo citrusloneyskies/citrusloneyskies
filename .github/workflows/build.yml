@@ -100,8 +100,8 @@ jobs:
           from PIL import Image
           for f in sorted(glob.glob('run/screenshots/*.png')):
               im = Image.open(f).convert('RGB')
-              im.thumbnail((960, 540))
-              im.save(os.path.join('docs/screenshots', os.path.splitext(os.path.basename(f))[0] + '.jpg'), 'JPEG', quality=82)
+              im.thumbnail((1280, 720))
+              im.save(os.path.join('docs/screenshots', os.path.splitext(os.path.basename(f))[0] + '.jpg'), 'JPEG', quality=86)
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
