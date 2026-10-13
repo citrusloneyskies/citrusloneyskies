@@ -112,7 +112,7 @@ public class TurretEntity extends Mob implements SiegeAlly {
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-        anim.onSync(key);
+        if (anim != null) anim.onSync(key);
         if (LEVEL.equals(key)) {
             sizeLevel = turretLevel();
             refreshDimensions();

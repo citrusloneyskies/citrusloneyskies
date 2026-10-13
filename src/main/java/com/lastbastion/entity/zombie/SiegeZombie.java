@@ -114,7 +114,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-        anim.onSync(key);
+        if (anim != null) anim.onSync(key);
         if (RANK.equals(key) || AFFIXES.equals(key)) updateSize();
         if (RISE.equals(key) && level().isClientSide && entityData.get(RISE) > 0) clientRiseStart = tickCount;
     }

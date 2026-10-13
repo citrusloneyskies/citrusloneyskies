@@ -121,7 +121,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
-        anim.onSync(key);
+        if (anim != null) anim.onSync(key);
     }
 
     @Override
