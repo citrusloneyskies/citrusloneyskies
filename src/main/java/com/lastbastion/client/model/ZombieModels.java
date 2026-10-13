@@ -245,6 +245,8 @@ public final class ZombieModels {
         rarm.child("wclaw_r", 0, 11, 0).box(-1.5f, 0, -1.5f, 3, 4, 3, claw);
         larm.child("wclaw_l", 0, 11, 0).box(-1.5f, 0, -1.5f, 3, 4, 3, claw);
         body.child("core", 0, 4, -2.6f).box(-1.5f, 0, 0, 3, 3, 0.2f, Paint.glowing(0x7FFFF0).flat());
+        s.root.child("rleg", -2, 24, 0);
+        s.root.child("lleg", 2, 24, 0);
         Rig r = rigOf(s, body, head, rarm, larm);
         rankGear(r, 8, 1f);
     }

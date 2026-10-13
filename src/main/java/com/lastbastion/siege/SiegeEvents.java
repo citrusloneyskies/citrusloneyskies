@@ -38,6 +38,19 @@ public final class SiegeEvents {
         }
     }
 
+    /** No sleeping through the siege: nightfall is when the horde comes. */
+    @SubscribeEvent
+    public static void onSleep(net.minecraftforge.event.entity.player.PlayerSleepInBedEvent e) {
+        if (!(e.getEntity().level() instanceof ServerLevel sl)) return;
+        net.minecraft.core.BlockPos core = SiegeManager.corePos(sl);
+        if (core != null && core.closerToCenterThan(e.getEntity().position(), 256)) {
+            e.setResult(Player.BedSleepingProblem.OTHER_PROBLEM);
+            e.getEntity().displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    "You cannot rest while the Siege Core stands - the horde comes at nightfall.")
+                    .withStyle(net.minecraft.ChatFormatting.RED), true);
+        }
+    }
+
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
         SiegeCommands.register(e.getDispatcher());

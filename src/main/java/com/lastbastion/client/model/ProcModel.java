@@ -54,10 +54,15 @@ public class ProcModel<T extends Entity> extends EntityModel<T> {
     @Override
     public void setupAnim(T entity, float limbSwing, float limbAmount, float age, float headYaw, float headPitch) {
         baked.root.getAllParts().forEach(ModelPart::resetPose);
+        applyGates();
+        animator.animate(this, entity, limbSwing, limbAmount, age, headYaw, headPitch, partialTick);
+    }
+
+    /** Show/hide level-gated parts for the current {@link #level}. */
+    public void applyGates() {
         for (Map.Entry<ModelPart, int[]> g : baked.levelGates.entrySet()) {
             g.getKey().visible = level >= g.getValue()[0] && level <= g.getValue()[1];
         }
-        animator.animate(this, entity, limbSwing, limbAmount, age, headYaw, headPitch, partialTick);
     }
 
     @Override

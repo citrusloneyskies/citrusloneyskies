@@ -75,6 +75,7 @@ public final class MiscModels {
     public static SimpleProcRenderer<SiegeProjectile> projectileRenderer(EntityRendererProvider.Context ctx) {
         return new SimpleProcRenderer<>(ctx, projectiles(), (m, e, ls, la, age, hy, hp, pt) -> {
             m.level = e.kind().ordinal() + 1;
+            m.applyGates();
             m.p("p").zRot = e.kind() == ProjKind.BOULDER || e.kind() == ProjKind.GRENADE ? age * 0.4f : 0;
             ModelPart fs = m.opt("fs");
             if (fs != null) fs.zRot = age * 0.5f;
