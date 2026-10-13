@@ -132,6 +132,8 @@ public final class SiegeManager {
     // ------------------------------------------------------------------ tick
 
     private static boolean wasNight;
+    /** GameTests have no players; this lets the siege progress anyway. */
+    public static boolean forcePresence;
 
     public static void tick(ServerLevel level) {
         SiegeData d = data(level);
@@ -143,7 +145,7 @@ public final class SiegeManager {
             onCoreRemoved(level, core);
             return;
         }
-        boolean present = !playersNear(level, core, SiegeConfig.PLAYER_PRESENCE_RADIUS.get()).isEmpty();
+        boolean present = forcePresence || !playersNear(level, core, SiegeConfig.PLAYER_PRESENCE_RADIUS.get()).isEmpty();
         long gt = level.getGameTime();
         boolean night = isNight(level);
 
