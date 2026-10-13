@@ -142,4 +142,25 @@ public final class SiegeGameTests {
             else h.fail("wave 10 spawned nothing");
         });
     }
+
+    @GameTest(template = "arena", timeoutTicks = 60, batch = "siege_shop")
+    public static void shopPurchaseAndUpgrade(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        net.minecraft.server.level.ServerPlayer p = h.makeMockServerPlayerInLevel();
+        p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        p.moveTo(core.getX() + 2.5, core.getY(), core.getZ() + 0.5);
+        SiegeData d = SiegeManager.data(level);
+        d.credits.put(p.getUUID(), 2000);
+        com.lastbastion.siege.ShopCatalog.purchase(p, "turret_ballista", 0);
+        com.lastbastion.siege.ShopCatalog.purchase(p, "upgrade_fortify", 0);
+        int left = d.credits(p.getUUID());
+        boolean hasKit = p.getInventory().contains(new net.minecraft.world.item.ItemStack(
+                com.lastbastion.registry.ModItems.TURRET_KITS.get(TurretKind.BALLISTA).get()));
+        int fort = d.level(com.lastbastion.siege.CoreUpgrade.FORTIFY);
+        teardown(h, core);
+        d.upgrades[com.lastbastion.siege.CoreUpgrade.FORTIFY.ordinal()] = 0;
+        if (left == 2000 - 150 - 300 && hasKit && fort == 1) h.succeed();
+        else h.fail("shop mismatch: credits=" + left + " kit=" + hasKit + " fortify=" + fort);
+    }
 }
