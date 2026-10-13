@@ -79,7 +79,7 @@ public final class SiegeGameTests {
             HeroKind k = HeroKind.values()[i];
             HeroEntity hero = k.type().get().create(level);
             Vec3 p = ring(core, 7, i, HeroKind.values().length);
-            hero.moveTo(p.x, p.y + (k.flying ? 3 : 0), p.z);
+            hero.moveTo(p.x, p.y, p.z);
             hero.finalizeSpawn(level, level.getCurrentDifficultyAt(core), MobSpawnType.EVENT, null, null);
             hero.setMode(i % 2 == 0 ? HeroMode.GUARD : HeroMode.HUNT);
             hero.setLevelAndXp(1 + i % 5, 0);

@@ -61,8 +61,14 @@ public class HeroScreen extends Screen {
         float hp = hero.getHealth() / hero.getMaxHealth();
         g.fill(left + 8, y, left + W - 8, y + 5, 0xFF202020);
         g.fill(left + 8, y, left + 8 + (int) ((W - 16) * hp), y + 5, 0xFF50D060);
-        y += 10;
-        g.drawString(font, "HP " + (int) hero.getHealth() + "/" + (int) hero.getMaxHealth() + "   XP " + hero.xp() + (lv < 5 ? "/" + next : " (max)"),
+        y += 7;
+        float ult = hero.ultEnergy() / 100f;
+        g.fill(left + 8, y, left + W - 8, y + 4, 0xFF202020);
+        int ultCol = ult >= 1 ? (hero.tickCount / 4 % 2 == 0 ? 0xFFFFFFFF : 0xFF000000 | hero.kind.color) : 0xFF000000 | hero.kind.color;
+        g.fill(left + 8, y, left + 8 + (int) ((W - 16) * ult), y + 4, ultCol);
+        y += 8;
+        g.drawString(font, "HP " + (int) hero.getHealth() + "/" + (int) hero.getMaxHealth() + "   XP " + hero.xp() + (lv < 5 ? "/" + next : " (max)")
+                        + "   Ultimate " + (int) hero.ultEnergy() + "%   " + hero.kind.role.name().charAt(0) + hero.kind.role.name().substring(1).toLowerCase(),
                 left + 8, y, 0xC8C8C8, false);
         y += 12;
         for (FormattedCharSequence s : font.split(Component.literal(hero.kind.moves), W - 16)) {

@@ -45,6 +45,36 @@ public final class Anim {
         return Mth.sin(x * Mth.PI);
     }
 
+    /**
+     * Keyframe track: {@code tv} is (time, value) pairs in ascending time. Values are smoothly
+     * interpolated between keys and held before the first / after the last.
+     */
+    public static float kf(float t, float... tv) {
+        if (tv.length < 2) return 0;
+        if (t <= tv[0]) return tv[1];
+        for (int i = 2; i < tv.length; i += 2) {
+            if (t <= tv[i]) {
+                float t0 = tv[i - 2], t1 = tv[i];
+                float x = t1 - t0 <= 1e-4f ? 1 : (t - t0) / (t1 - t0);
+                return Mth.lerp(smooth(x), tv[i - 1], tv[i + 1]);
+            }
+        }
+        return tv[tv.length - 1];
+    }
+
+    /** Keyframe track with values given in degrees; returns radians. */
+    public static float kfd(float t, float... tv) {
+        return kf(t, tv) * D;
+    }
+
+    /** 0 outside [start, end], 1 inside, with {@code fade} ticks of smooth ramp at both ends. */
+    public static float hold(float t, float start, float end, float fade) {
+        if (t < start - fade || t > end + fade) return 0;
+        if (t < start) return smooth((t - start + fade) / fade);
+        if (t > end) return smooth(1 - (t - end) / fade);
+        return 1;
+    }
+
     public static void walk(ModelPart rightLeg, ModelPart leftLeg, float limbSwing, float limbAmount, float amp) {
         rightLeg.xRot += Mth.cos(limbSwing * 0.6662f) * amp * limbAmount;
         leftLeg.xRot += Mth.cos(limbSwing * 0.6662f + Mth.PI) * amp * limbAmount;

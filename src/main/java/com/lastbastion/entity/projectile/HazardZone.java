@@ -36,7 +36,8 @@ public class HazardZone extends Entity {
     private static final EntityDataAccessor<Integer> FUSE = SynchedEntityData.defineId(HazardZone.class, EntityDataSerializers.INT);
 
     public enum Kind {
-        FIRE, ACID, POISON_CLOUD, FROST, WHIRLPOOL, TORNADO, HOLY, STORM, ORBITAL, BONE_SPIKES, PLAGUE_RAIN, SOUL_FIRE, METEOR_RAIN, AIRSTRIKE
+        FIRE, ACID, POISON_CLOUD, FROST, WHIRLPOOL, TORNADO, HOLY, STORM, ORBITAL, BONE_SPIKES, PLAGUE_RAIN, SOUL_FIRE, METEOR_RAIN, AIRSTRIKE,
+        SANDSTORM, GRAVITY_WELL, CONSECRATION, BLOOD_POOL, SHADOW_POOL
     }
 
     public int duration = 100;
@@ -187,6 +188,36 @@ public class HazardZone extends Entity {
                 e.setDeltaMovement(e.getDeltaMovement().add(0, 0.5, 0));
                 e.hurtMarked = true;
             });
+            case SANDSTORM -> targets.forEach(e -> {
+                SiegeDamage.deal(e, this, owner, 1.5f * power, Element.PHYSICAL, false);
+                e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 30, 1));
+                SiegeDamage.apply(e, ModEffects.DISORIENTED.get(), 30, 0);
+            });
+            case GRAVITY_WELL -> targets.forEach(e -> {
+                Vec3 pull = c.subtract(e.position()).multiply(1, 0, 1);
+                if (pull.lengthSqr() > 0.2) {
+                    pull = pull.normalize().scale(0.45);
+                    e.setDeltaMovement(e.getDeltaMovement().scale(0.2).add(pull.x, 0.04, pull.z));
+                    e.hurtMarked = true;
+                }
+                SiegeDamage.deal(e, this, owner, 1f * power, Element.ARCANE, false);
+            });
+            case CONSECRATION -> {
+                targets.forEach(e -> {
+                    SiegeDamage.deal(e, this, owner, 1.5f * power, Element.HOLY, false);
+                    SiegeDamage.apply(e, ModEffects.PURIFIED.get(), 40, 0);
+                });
+                for (LivingEntity d : hostile ? SiegeDamage.enemiesAround(sl, c, r) : SiegeDamage.defendersAround(sl, c, r)) d.heal(1.5f * power);
+            }
+            case BLOOD_POOL -> targets.forEach(e -> {
+                SiegeDamage.deal(e, this, owner, 1.5f * power, Element.PHYSICAL, false);
+                SiegeDamage.applyStacking(e, ModEffects.BLEEDING.get(), 60, 2);
+                e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 30, 0));
+            });
+            case SHADOW_POOL -> targets.forEach(e -> {
+                SiegeDamage.deal(e, this, owner, 2f * power, Element.SHADOW, false);
+                e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 30, 1));
+            });
             case METEOR_RAIN -> {
                 if (age % 10 == 0) {
                     RandomSource rr = sl.random;
@@ -256,6 +287,18 @@ public class HazardZone extends Entity {
                 case POISON_CLOUD -> l.addParticle(Fx.dust(0x5E9E2A, 2.2f), x, y + r.nextDouble() * 2, z, 0, 0.01, 0);
                 case PLAGUE_RAIN -> l.addParticle(Fx.dust(0x9BD940, 1.0f), x, y + 6 + r.nextDouble() * 4, z, 0, -0.5, 0);
                 case FROST -> l.addParticle(ParticleTypes.SNOWFLAKE, x, y + r.nextDouble(), z, 0, 0, 0);
+                case SANDSTORM -> {
+                    double sp = age * 0.25 + d * 0.8;
+                    l.addParticle(com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.SMOKE, 0xE8C878, 0.9f, 24),
+                            getX() + Math.cos(sp) * d, y + r.nextDouble() * 3, getZ() + Math.sin(sp) * d, -Math.sin(sp) * 0.2, 0.02, Math.cos(sp) * 0.2);
+                }
+                case GRAVITY_WELL -> {
+                    Vec3 to = position().subtract(x, y, z).scale(0.12);
+                    l.addParticle(com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.GLOW, 0xA070FF, 0.25f, 10), x, y + 0.5, z, to.x, 0.02, to.z);
+                }
+                case CONSECRATION -> l.addParticle(com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.STAR, 0xFFE8A0, 0.18f, 20), x, y, z, 0, 0.05, 0);
+                case BLOOD_POOL -> l.addParticle(com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.DROP, 0x8A0A14, 0.14f, 14), x, y + 0.2, z, 0, 0.1, 0);
+                case SHADOW_POOL -> l.addParticle(com.lastbastion.fx.FxParticleOptions.of(com.lastbastion.fx.FxStyle.SOUL, 0x5A2A7A, 0.3f, 20), x, y, z, 0, 0.04, 0);
                 case WHIRLPOOL -> {
                     double sp = age * 0.3 + d;
                     l.addParticle(ParticleTypes.BUBBLE_POP, getX() + Math.cos(sp) * d, y + 0.2, getZ() + Math.sin(sp) * d, 0, 0.05, 0);

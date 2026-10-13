@@ -65,16 +65,16 @@ public final class ModEntities {
                     MobCategory.MISC, 0.95f, 1.6f, 10));
         }
 
-        HEROES.put(HeroKind.ASHFANG, reg("ashfang", AshfangHero::new, MobCategory.CREATURE, 1.0f, 1.2f, 10));
-        HEROES.put(HeroKind.SYLVA, reg("sylva", SylvaHero::new, MobCategory.CREATURE, 0.6f, 1.85f, 10));
-        HEROES.put(HeroKind.BASTION, reg("bastion", BastionHero::new, MobCategory.CREATURE, 1.6f, 3.2f, 10));
-        HEROES.put(HeroKind.ALDRIC, reg("aldric", AldricHero::new, MobCategory.CREATURE, 0.7f, 2.0f, 10));
-        HEROES.put(HeroKind.MORGANA, reg("morgana", MorganaHero::new, MobCategory.CREATURE, 0.6f, 1.9f, 10));
-        HEROES.put(HeroKind.KAGE, reg("kage", KageHero::new, MobCategory.CREATURE, 0.6f, 1.85f, 10));
-        HEROES.put(HeroKind.AEGIS7, reg("aegis7", Aegis7Hero::new, MobCategory.CREATURE, 2.0f, 4.2f, 12));
-        HEROES.put(HeroKind.IGNIS, reg("ignis", IgnisHero::new, MobCategory.CREATURE, 1.4f, 1.2f, 12));
-        HEROES.put(HeroKind.VORTHAX, reg("vorthax", VorthaxHero::new, MobCategory.CREATURE, 3.5f, 2.8f, 16));
-        HEROES.put(HeroKind.ZEUS, reg("zeus", ZeusHero::new, MobCategory.CREATURE, 0.9f, 2.6f, 12));
+        HEROES.put(HeroKind.ASHFANG, reg("ashfang", AshfangHero::new, MobCategory.CREATURE, 1.15f, 1.35f, 10));
+        HEROES.put(HeroKind.SYLVA, reg("sylva", SylvaHero::new, MobCategory.CREATURE, 0.6f, 1.9f, 10));
+        HEROES.put(HeroKind.BASTION, reg("bastion", BastionHero::new, MobCategory.CREATURE, 1.7f, 3.3f, 10));
+        HEROES.put(HeroKind.ALDRIC, reg("aldric", AldricHero::new, MobCategory.CREATURE, 0.75f, 2.05f, 10));
+        HEROES.put(HeroKind.MORGANA, reg("morgana", MorganaHero::new, MobCategory.CREATURE, 0.6f, 1.95f, 10));
+        HEROES.put(HeroKind.KAGE, reg("kage", KageHero::new, MobCategory.CREATURE, 0.6f, 1.9f, 10));
+        HEROES.put(HeroKind.AEGIS7, reg("aegis7", Aegis7Hero::new, MobCategory.CREATURE, 2.0f, 4.3f, 12));
+        HEROES.put(HeroKind.ASTERION, reg("asterion", AsterionHero::new, MobCategory.CREATURE, 1.4f, 3.1f, 12));
+        HEROES.put(HeroKind.ANUBIS, reg("anubis", AnubisHero::new, MobCategory.CREATURE, 0.9f, 2.7f, 12));
+        HEROES.put(HeroKind.ZEUS, reg("zeus", ZeusHero::new, MobCategory.CREATURE, 0.95f, 2.8f, 12));
     }
 
     private static <T extends Entity> RegistryObject<EntityType<T>> reg(String name, EntityType.EntityFactory<T> factory, MobCategory cat,

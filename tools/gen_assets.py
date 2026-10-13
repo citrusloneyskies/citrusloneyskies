@@ -91,8 +91,8 @@ TURRETS = [('ballista', 'Ballista', 0x8A6A3A), ('flame', 'Inferno Turret', 0xFF6
 HEROES = [('ashfang', 'Ashfang the Dire Wolf', 0x8A8F99), ('sylva', 'Sylva the Huntress', 0x3F8F4A),
           ('bastion', 'Bastion, the Stone Colossus', 0x8C8577), ('aldric', 'Sir Aldric, Knight of Dawn', 0xFFD966),
           ('morgana', 'Morgana the Stormweaver', 0x7A4AE0), ('kage', 'Kage the Ronin', 0xC01030),
-          ('aegis7', 'AEGIS-7 War Mech', 0x5B6E7A), ('ignis', 'Ignis the Phoenix', 0xFF7A1A),
-          ('vorthax', 'Vorthax the Elder Dragon', 0xB02020), ('zeus', 'Zeus, King of Olympus', 0xF4F06A)]
+          ('aegis7', 'AEGIS-7 War Mech', 0x5B6E7A), ('asterion', 'Asterion, the Minotaur King', 0x9A5A2E),
+          ('anubis', 'Anubis, Judge of the Dead', 0xE0B040), ('zeus', 'Zeus, King of Olympus', 0xF4F06A)]
 ZOMBIES = [('shambler', 'Shambler'), ('runner', 'Runner'), ('spitter', 'Spitter'), ('brute', 'Brute'), ('bloater', 'Bloater'),
            ('leaper', 'Leaper'), ('bulwark', 'Bulwark'), ('burrower', 'Burrower'), ('shrieker', 'Shrieker'), ('wraith', 'Wraith'),
            ('wrecker', 'Wrecker'), ('necromancer', 'Necromancer')]

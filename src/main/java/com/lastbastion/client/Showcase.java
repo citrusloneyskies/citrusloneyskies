@@ -100,7 +100,8 @@ public final class Showcase {
         }
         TurretKind[] tk = TurretKind.values();
         for (int i = 0; i < tk.length; i++) {
-            SHOTS.add(new Shot(String.format("%02d_turret_%s", n++, tk[i].id), new Vec3(turretX(i) + 3.9, y + 2.6, TURRET_Z - 6.8), 0, 15));
+            SHOTS.add(new Shot(String.format("%02d_turret_%s_1_3", n++, tk[i].id), new Vec3(turretX(i) + 1.2, y + 1.7, TURRET_Z - 3.6), 0, 14));
+            SHOTS.add(new Shot(String.format("%02d_turret_%s_5ab", n++, tk[i].id), new Vec3(turretX(i) + 6.45, y + 1.9, TURRET_Z - 4.0), 0, 12));
         }
         BossKind[] bk = BossKind.values();
         for (int i = 0; i < bk.length; i++) {
@@ -234,7 +235,9 @@ public final class Showcase {
                 if (t == null) continue;
                 t.setTurretLevel(lv[j]);
                 t.setBranch(br[j]);
-                pose(t, level, xs[j], GROUND, TURRET_Z, true);
+                pose(t, level, xs[j], GROUND, TURRET_Z, false);
+                t.setAim(180, 0);
+                level.addFreshEntity(t);
             }
         }
         BossKind[] bk = BossKind.values();

@@ -30,6 +30,8 @@ public final class Net {
                 .encoder(ExoInputPacket::encode).decoder(ExoInputPacket::new).consumerMainThread(ExoInputPacket::handle).add();
         CHANNEL.messageBuilder(VfxPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(VfxPacket::encode).decoder(VfxPacket::new).consumerMainThread(VfxPacket::handle).add();
+        CHANNEL.messageBuilder(SpeechPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SpeechPacket::encode).decoder(SpeechPacket::new).consumerMainThread(SpeechPacket::handle).add();
     }
 
     public static void sendTo(ServerPlayer player, Object msg) {

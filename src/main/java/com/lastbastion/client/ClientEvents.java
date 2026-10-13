@@ -71,6 +71,7 @@ public final class ClientEvents {
     public static void onRenderLevel(RenderLevelStageEvent e) {
         if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         com.lastbastion.client.fx.VfxManager.render(e);
+        renderSpeech(e);
         if (ClientSiegeState.POPUPS.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         Camera cam = e.getCamera();
@@ -91,6 +92,43 @@ public final class ClientEvents {
             Matrix4f m = pose.last().pose();
             int a = (int) (alpha * 255) << 24;
             font.drawInBatch(text, -font.width(text) / 2f, 0, a | 0xFFD966, false, m, buf, Font.DisplayMode.SEE_THROUGH, 0, LightTexture.FULL_BRIGHT);
+            pose.popPose();
+        }
+        buf.endBatch();
+    }
+
+    /** Floating captions for hero and boss lines. */
+    private static void renderSpeech(RenderLevelStageEvent e) {
+        if (ClientSiegeState.SPEECH.isEmpty()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) return;
+        Camera cam = e.getCamera();
+        Vec3 cp = cam.getPosition();
+        PoseStack pose = e.getPoseStack();
+        MultiBufferSource.BufferSource buf = mc.renderBuffers().bufferSource();
+        Font font = mc.font;
+        float pt = e.getPartialTick();
+        for (ClientSiegeState.Speech s : ClientSiegeState.SPEECH) {
+            net.minecraft.world.entity.Entity ent = mc.level.getEntity(s.entity);
+            if (ent == null || ent.distanceToSqr(cp) > 48 * 48) continue;
+            float age = s.age + pt;
+            float alpha = Math.min(1f, Math.min(age / 4f, (70 - age) / 10f));
+            if (alpha <= 0.02f) continue;
+            Vec3 p = ent.getPosition(pt).add(0, ent.getBbHeight() + 0.55 + Math.min(age, 6) * 0.02, 0);
+            pose.pushPose();
+            pose.translate(p.x - cp.x, p.y - cp.y, p.z - cp.z);
+            pose.mulPose(cam.rotation());
+            float sc = 0.026f;
+            pose.scale(-sc, -sc, sc);
+            Matrix4f m = pose.last().pose();
+            int a = (int) (alpha * 255) << 24;
+            String text = "\u201C" + s.text + "\u201D";
+            float x = -font.width(text) / 2f;
+            int c = s.color;
+            int r = ((c >> 16) & 255) + (255 - ((c >> 16) & 255)) * 45 / 100, g = ((c >> 8) & 255) + (255 - ((c >> 8) & 255)) * 45 / 100,
+                    bl = (c & 255) + (255 - (c & 255)) * 45 / 100;
+            font.drawInBatch(text, x, 0, a | (r << 16) | (g << 8) | bl, false, m, buf, Font.DisplayMode.NORMAL,
+                    ((int) (alpha * 0x90) << 24), LightTexture.FULL_BRIGHT);
             pose.popPose();
         }
         buf.endBatch();

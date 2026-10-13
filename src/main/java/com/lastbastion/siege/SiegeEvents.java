@@ -29,6 +29,11 @@ public final class SiegeEvents {
                 && sl.getEntity(e.getEntity().getPersistentData().getInt("lb_plague")) instanceof com.lastbastion.entity.turret.TurretEntity t && t.isAlive()) {
             t.spreadPlague(sl, e.getEntity());
         }
+        if (e.getEntity() instanceof SiegeEnemy && e.getEntity().level() instanceof ServerLevel sl
+                && e.getEntity().getPersistentData().contains("lb_curse")
+                && sl.getEntity(e.getEntity().getPersistentData().getInt("lb_curse")) instanceof com.lastbastion.entity.hero.AnubisHero a && a.isAlive()) {
+            a.curseBurst(sl, e.getEntity());
+        }
         if (e.getEntity() instanceof SiegeEnemy && e.getEntity().level() instanceof ServerLevel sl) {
             SiegeManager.onEnemyKilled(sl, e.getEntity(), e.getSource().getEntity());
         }

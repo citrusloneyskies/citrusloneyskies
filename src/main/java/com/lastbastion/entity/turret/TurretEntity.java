@@ -229,6 +229,14 @@ public class TurretEntity extends Mob implements SiegeAlly {
         return entityData.get(TARGET_ID) >= 0;
     }
 
+    /** Point the weapon (used by the showcase and when deploying facing the player). */
+    public void setAim(float yaw, float pitch) {
+        entityData.set(AIM_YAW, yaw);
+        entityData.set(AIM_PITCH, pitch);
+        clientYaw = clientYawO = yaw;
+        clientPitch = clientPitchO = pitch;
+    }
+
     public float aimYaw() {
         return entityData.get(AIM_YAW);
     }

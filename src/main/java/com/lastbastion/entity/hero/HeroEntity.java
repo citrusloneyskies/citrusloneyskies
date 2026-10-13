@@ -1,19 +1,22 @@
 package com.lastbastion.entity.hero;
 
 import com.lastbastion.combat.Element;
-import com.lastbastion.combat.Fx;
 import com.lastbastion.combat.SiegeAlly;
 import com.lastbastion.combat.SiegeDamage;
 import com.lastbastion.combat.SiegeEnemy;
 import com.lastbastion.entity.AnimTracker;
+import com.lastbastion.entity.turret.TurretEntity;
+import com.lastbastion.fx.DangerZones;
+import com.lastbastion.fx.FxStyle;
+import com.lastbastion.fx.Vfx;
 import com.lastbastion.network.Net;
 import com.lastbastion.network.OpenScreenPacket;
+import com.lastbastion.network.SpeechPacket;
 import com.lastbastion.registry.ModEffects;
 import com.lastbastion.siege.SiegeData;
 import com.lastbastion.siege.SiegeManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -30,37 +33,50 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Base hero AI. Each hero runs a brain every tick:
+ * Base hero AI. Every tick the brain runs, in order:
  * <ol>
- *   <li><b>Skill in progress</b> - follow its timeline (wind-up, impact frames, recovery). Nothing interrupts it.</li>
- *   <li><b>Target selection</b> (every 10 ticks) by mode:
- *     <ul><li>GUARD - enemies within 18 blocks of the core, scored by distance-to-core (closest = most dangerous) and core damage.</li>
- *     <li>HUNT - anything within 48 blocks of the core; bosses/champions/specials weighted heavily, then distance to self.</li>
- *     <li>FOLLOW - enemies within 12 blocks of the summoner, preferring those attacking them.</li></ul></li>
- *   <li><b>Skill choice</b> - each hero evaluates its abilities (cooldown + situational conditions such as enemy count, HP, distance).</li>
- *   <li><b>Basic attack</b> - melee or ranged with wind-up animation; ranged heroes kite to their preferred range.</li>
- *   <li><b>Idle</b> - GUARD returns to its post around the core, FOLLOW trails the owner (teleporting if left far behind), HUNT patrols.</li>
+ *   <li><b>Danger check</b> - if standing in a telegraphed boss/elite attack ({@link DangerZones}), dodge out
+ *   (cancelling a skill that is still winding up).</li>
+ *   <li><b>Skill in progress</b> - follow its timeline (wind-up, impact frames, recovery).</li>
+ *   <li><b>Morale</b> - non-tanks below their retreat threshold fall back toward the core and healers until
+ *   patched up; tanks never retreat.</li>
+ *   <li><b>Target selection</b> (every 10 ticks), scored by mode and role: GUARD protects the core,
+ *   HUNT roams for priority targets, FOLLOW protects the summoner. Every role values enemies that are
+ *   hitting the core or an ally; tanks pull bosses and big groups, assassins dive the back line
+ *   (spitters, necromancers, shriekers) and wounded prey, ranged heroes pick off whatever threatens allies.</li>
+ *   <li><b>Ultimate</b> - charged by dealing and taking damage; fired when the situation is worth it.</li>
+ *   <li><b>Skills</b> - each hero scores its kit against the situation (crowds, HP, distance, allies).</li>
+ *   <li><b>Basic attack and footwork</b> - melee heroes close in and circle between swings, ranged heroes kite
+ *   to their preferred range and strafe while shooting.</li>
+ *   <li><b>Idle</b> - GUARD holds a post at the core, FOLLOW escorts the owner, HUNT patrols the ring.</li>
  * </ol>
- * Heroes regenerate out of combat, level up from kills (Lv 1-5: +12% HP/damage per level and a brighter aura),
- * and when slain can be revived at the core for half price.
+ * Heroes regenerate out of combat, level up from kills (Lv 1-5, +12% HP/damage per level, extra gear on the
+ * model), speak a few lines in character, and when slain can be revived at the core for half price.
  */
 public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
+    /** Basic attack animation ids are 1..5 (combo step); hero skills use 6..19. */
     public static final int ANIM_NONE = 0, ANIM_ATTACK = 1, ANIM_ATTACK2 = 2, ANIM_ATTACK3 = 3;
+    public static final int ANIM_ULT = 20, ANIM_DODGE = 21, ANIM_ARRIVE = 22, ANIM_LEVELUP = 23, ANIM_STAGGER = 24;
+    public static final int ULT = 20;
     public static final int[] XP_LEVELS = {0, 60, 160, 360, 700};
+
+    public enum Role {TANK, BRUISER, ASSASSIN, RANGED, SUPPORT}
 
     private static final EntityDataAccessor<Optional<UUID>> OWNER = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.OPTIONAL_UUID);
     private static final EntityDataAccessor<Integer> MODE = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
@@ -68,6 +84,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     private static final EntityDataAccessor<Integer> LEVEL = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> XP = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> FLAG = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Float> ULT_ENERGY = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Boolean> COMBAT = SynchedEntityData.defineId(HeroEntity.class, EntityDataSerializers.BOOLEAN);
 
     public final HeroKind kind;
     public final AnimTracker anim;
@@ -75,13 +93,19 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     protected LivingEntity target;
     protected int skill;
     protected int skillTick;
-    protected final int[] cooldowns = new int[16];
+    protected final int[] cooldowns = new int[24];
     private int retarget;
     private int attackCooldown;
     private int swing = -1;
     protected int combo;
     private int repath;
     private int lastDamaged = -1000;
+    private int lastCombat = -1000;
+    private int dodgeCooldown;
+    private int lastSpoke = -1000;
+    protected boolean retreating;
+    private int strafeDir = 1;
+    private int strafeTimer;
     private final float postAngle;
 
     protected HeroEntity(EntityType<? extends HeroEntity> type, Level level, HeroKind kind) {
@@ -90,9 +114,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         this.anim = new AnimTracker(this, ANIM);
         this.postAngle = level.random.nextFloat() * Mth.TWO_PI;
         setPersistenceRequired();
-        setMaxUpStep(1.2f);
+        setMaxUpStep(kind.hp > 300 ? 1.6f : 1.2f);
         xpReward = 0;
-        if (kind.flying) setNoGravity(true);
     }
 
     public static AttributeSupplier.Builder createAttributes(HeroKind k) {
@@ -103,8 +126,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
                 .add(Attributes.ARMOR_TOUGHNESS, k.armor / 3)
                 .add(Attributes.MOVEMENT_SPEED, k.speed)
                 .add(Attributes.KNOCKBACK_RESISTANCE, k.hp > 300 ? 0.9 : 0.5)
-                .add(Attributes.FOLLOW_RANGE, 64)
-                .add(Attributes.FLYING_SPEED, 0.6);
+                .add(Attributes.FOLLOW_RANGE, 64);
     }
 
     @Override
@@ -116,6 +138,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         entityData.define(LEVEL, 1);
         entityData.define(XP, 0);
         entityData.define(FLAG, false);
+        entityData.define(ULT_ENERGY, 0f);
+        entityData.define(COMBAT, false);
     }
 
     @Override
@@ -155,6 +179,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         entityData.set(MODE, m.ordinal());
         target = null;
         retarget = 0;
+        retreating = false;
     }
 
     public int heroLevel() {
@@ -173,6 +198,29 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         entityData.set(FLAG, b);
     }
 
+    /** True while the hero has a target (client poses: weapon raised, fighting stance). */
+    public boolean inCombat() {
+        return entityData.get(COMBAT);
+    }
+
+    /** Ultimate charge, 0..100. */
+    public float ultEnergy() {
+        return entityData.get(ULT_ENERGY);
+    }
+
+    public boolean ultReady() {
+        return ultEnergy() >= 100f;
+    }
+
+    public void gainUlt(float amount) {
+        if (amount <= 0 || skill == ULT) return;
+        entityData.set(ULT_ENERGY, Math.min(100f, ultEnergy() + amount));
+    }
+
+    protected void spendUlt() {
+        entityData.set(ULT_ENERGY, 0f);
+    }
+
     public void setLevelAndXp(int level, int xp) {
         entityData.set(LEVEL, Mth.clamp(level, 1, 5));
         entityData.set(XP, xp);
@@ -189,9 +237,12 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             applyLevelStats();
             setHealth(getMaxHealth());
             if (level() instanceof ServerLevel sl) {
-                Fx.spiral(sl, position(), getBbWidth() + 0.5, getBbHeight() + 1, Fx.dust(kind.color, 1.5f), 3, 0);
-                Fx.skyBeam(sl, position(), 0xFFE38A, 12, 1);
+                Vfx.vortex(sl, position(), kind.color, 0xFFE38A, getBbWidth() + 0.6f, getBbHeight() + 1, 30, this);
+                Vfx.pillar(sl, position(), 0xFFE38A, getBbWidth() * 0.7f, 12, 24);
+                Vfx.spray(sl, FxStyle.STAR, position().add(0, getBbHeight() * 0.6, 0), 0xFFFFFF, kind.color, 0.3f, 24, 0.35f, 0.6f);
                 sl.playSound(null, blockPosition(), SoundEvents.PLAYER_LEVELUP, net.minecraft.sounds.SoundSource.NEUTRAL, 1.2f, 0.8f);
+                if (skill == 0) anim.play(ANIM_LEVELUP);
+                speak(Lines.LEVEL_UP, true);
                 if (owner() instanceof ServerPlayer sp) {
                     sp.displayClientMessage(Component.literal(kind.title + " reached Level " + lvl + "!").withStyle(ChatFormatting.GOLD), false);
                 }
@@ -207,8 +258,51 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
 
     /** Damage for a given multiplier of the hero's base damage, including level and buffs. */
     public float dmg(float mult) {
-        float d = (float) getAttributeValue(Attributes.ATTACK_DAMAGE) * mult;
-        return d;
+        return (float) getAttributeValue(Attributes.ATTACK_DAMAGE) * mult;
+    }
+
+    /** Deal hero damage (charges the ultimate). */
+    protected boolean hit(LivingEntity e, float amount, Element element) {
+        boolean ok = SiegeDamage.deal(e, this, this, amount, element, false);
+        if (ok) gainUlt(amount * ultGainPerDamage());
+        return ok;
+    }
+
+    /** Ultimate energy gained every half second while fighting. */
+    protected float ultPassive() {
+        return 0.35f;
+    }
+
+    /** Ultimate energy per point of damage dealt. Tuned (with {@link #ultPassive}) for roughly one ultimate per minute of fighting. */
+    protected float ultGainPerDamage() {
+        return 0.12f;
+    }
+
+    // ------------------------------------------------------------------ personality
+
+    /** Speech categories. */
+    public enum Lines {ARRIVE, ULT, BOSS, KILL, LOW_HP, LEVEL_UP, RETREAT, IDLE}
+
+    /** Lines this hero says, by category (may be empty). */
+    protected String[] lines(Lines which) {
+        return new String[0];
+    }
+
+    /** Say a random line from a category; rate-limited unless {@code force}. */
+    public void speak(Lines which, boolean force) {
+        if (!(level() instanceof ServerLevel sl)) return;
+        if (!force && tickCount - lastSpoke < 220) return;
+        String[] l = lines(which);
+        if (l.length == 0) return;
+        lastSpoke = tickCount;
+        String text = l[random.nextInt(l.length)];
+        Net.CHANNEL.send(PacketDistributor.TRACKING_ENTITY.with(() -> this), new SpeechPacket(getId(), text, kind.color));
+    }
+
+    /** Called by the sigil once the hero is in the world. */
+    public void onSummoned(ServerLevel level) {
+        anim.play(ANIM_ARRIVE);
+        speak(Lines.ARRIVE, true);
     }
 
     // ------------------------------------------------------------------ interaction
@@ -244,14 +338,30 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         if (isNoAi()) return;
         for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
         if (attackCooldown > 0) attackCooldown--;
-        if (tickCount - lastDamaged > 100 && tickCount % 20 == 0 && getHealth() < getMaxHealth()) heal(getMaxHealth() * 0.02f);
-        if (heroLevel() >= 4 && tickCount % 6 == 0) {
-            level.sendParticles(Fx.dust(kind.color, 0.9f), getX(), getY() + getBbHeight() * 0.5, getZ(), 1,
-                    getBbWidth() * 0.6, getBbHeight() * 0.4, getBbWidth() * 0.6, 0);
-        }
+        if (dodgeCooldown > 0) dodgeCooldown--;
+        boolean fighting = target != null || tickCount - lastCombat < 60;
+        if (!fighting && tickCount % 20 == 0 && getHealth() < getMaxHealth()) heal(getMaxHealth() * (retreating ? 0.05f : 0.025f));
+        if (fighting && tickCount % 10 == 0) gainUlt(ultPassive());
         passiveTick(level);
+        if (skill != ULT && isNoGravity()) setNoGravity(false);
 
         if (target != null && !validTarget(target)) target = null;
+        entityData.set(COMBAT, target != null);
+        if (target != null) lastCombat = tickCount;
+
+        // 1. get out of telegraphed attacks
+        if (dodgeCooldown <= 0 && (skill == 0 || (skillTick < 6 && skill != ULT)) && !hasEffect(ModEffects.FROZEN.get())) {
+            DangerZones.Zone z = DangerZones.threatAt(level, position(), true, getBbWidth() * 0.5 + 0.4);
+            if (z != null && canDodge()) {
+                if (skill != 0) {
+                    skill = 0;
+                    skillTick = 0;
+                }
+                dodge(level, z.escape(position()));
+                return;
+            }
+        }
+        // 2. skill in progress
         if (skill != 0) {
             skillTick++;
             if (tickSkill(level, skill, skillTick)) {
@@ -260,22 +370,63 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             }
             return;
         }
+        // 3. morale
+        if (role() != Role.TANK) {
+            if (!retreating && getHealth() < getMaxHealth() * retreatThreshold() && target != null) {
+                retreating = true;
+                speak(Lines.RETREAT, false);
+            } else if (retreating && getHealth() > getMaxHealth() * 0.6f) {
+                retreating = false;
+            }
+        }
         if (--retarget <= 0) {
             retarget = 10;
             LivingEntity t = pickTarget(level);
-            if (t != null) target = t;
+            if (t != target && t instanceof SiegeEnemy se && se.isHighPriority() && (target == null || !(target instanceof SiegeEnemy o && o.isHighPriority()))) {
+                speak(Lines.BOSS, false);
+            }
+            target = t;
         }
         setTarget(target);
         if (hasEffect(ModEffects.FROZEN.get()) || hasEffect(ModEffects.SHOCKED.get())) return;
 
         double dist = target != null ? distanceTo(target) : 999;
+        if (ultReady() && skill == 0) {
+            if (wantsUltimate(level, target, dist)) {
+                spendUlt();
+                speak(Lines.ULT, true);
+                startSkill(ULT);
+                return;
+            }
+        }
         int s = pickSkill(level, target, dist);
         if (s != 0) {
             startSkill(s);
             return;
         }
+        if (retreating) {
+            fallBack(level);
+            return;
+        }
         if (target != null) engage(level, target, dist);
         else idle(level);
+    }
+
+    protected boolean canDodge() {
+        return true;
+    }
+
+    /** Quick sidestep / roll out of danger. */
+    protected void dodge(ServerLevel level, Vec3 dir) {
+        dodgeCooldown = 26;
+        getNavigation().stop();
+        anim.play(ANIM_DODGE);
+        double power = role() == Role.TANK ? 0.65 : 0.95;
+        setDeltaMovement(dir.x * power, onGround() ? 0.28 : getDeltaMovement().y, dir.z * power);
+        hasImpulse = true;
+        faceTowards(position().add(dir.scale(-1)));
+        Vfx.dash(level, position().add(0, 0.6, 0), position().add(dir.scale(2.2)).add(0, 0.6, 0), kind.color, 0.5f, 8);
+        Vfx.spray(level, FxStyle.SMOKE, position().add(0, 0.2, 0), 0xB8B0A8, 0x8A8480, 0.6f, 5, 0.1f, -1);
     }
 
     protected void startSkill(int id) {
@@ -316,28 +467,58 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             }
             case FOLLOW -> {
                 centre = owner.position();
-                radius = 12;
+                radius = 14;
             }
             default -> {
                 centre = corePos;
                 radius = 48;
             }
         }
+        Role role = role();
         LivingEntity best = null;
         double bestScore = Double.MAX_VALUE;
         for (LivingEntity e : SiegeDamage.enemiesAround(level, centre, radius)) {
             if (!validTarget(e)) continue;
             double score;
             if (m == HeroMode.GUARD) {
-                score = e.position().distanceTo(corePos) + distanceTo(e) * 0.3;
+                score = e.position().distanceTo(corePos) + distanceTo(e) * 0.35;
             } else if (m == HeroMode.FOLLOW) {
-                score = e.distanceTo(owner) + (e instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == owner ? -6 : 0);
+                score = e.distanceTo(owner) + (e instanceof Mob mob && mob.getTarget() == owner ? -8 : 0);
             } else {
-                score = distanceTo(e);
-                if (e instanceof SiegeEnemy se && se.isHighPriority()) score -= 25;
-                if (e instanceof com.lastbastion.entity.zombie.NecromancerZombie || e instanceof com.lastbastion.entity.zombie.ShriekerZombie) score -= 12;
+                score = distanceTo(e) * 0.8;
             }
-            if (e == target) score -= 3; // stickiness
+            boolean priority = e instanceof SiegeEnemy se && se.isHighPriority();
+            boolean backline = e instanceof com.lastbastion.entity.zombie.NecromancerZombie || e instanceof com.lastbastion.entity.zombie.ShriekerZombie
+                    || e instanceof com.lastbastion.entity.zombie.SpitterZombie;
+            LivingEntity victim = e instanceof Mob mob ? mob.getTarget() : null;
+            boolean hittingAlly = victim != null && victim != this && SiegeDamage.isDefender(victim) && victim.distanceToSqr(e) < 16;
+            if (core != null && e.position().distanceToSqr(corePos) < 16) score -= 8;
+            if (hittingAlly) score -= role == Role.TANK || role == Role.SUPPORT ? 10 : 6;
+            if (victim == this) score -= role == Role.RANGED ? 7 : 3;
+            switch (role) {
+                case TANK -> {
+                    if (priority) score -= 18;
+                    score -= SiegeDamage.enemiesAround(level, e.position(), 4).size() * 1.5;
+                }
+                case ASSASSIN -> {
+                    if (backline) score -= 14;
+                    score -= (1 - e.getHealth() / e.getMaxHealth()) * 8;
+                    if (priority && m == HeroMode.HUNT) score -= 10;
+                }
+                case RANGED -> {
+                    if (backline) score -= 6;
+                    if (priority) score -= 8;
+                }
+                case BRUISER -> {
+                    if (priority) score -= 14;
+                    score -= SiegeDamage.enemiesAround(level, e.position(), 3.5).size();
+                }
+                case SUPPORT -> {
+                    if (priority) score -= 6;
+                }
+            }
+            if (m == HeroMode.HUNT && priority) score -= 12;
+            if (e == target) score -= 4;
             if (score < bestScore) {
                 bestScore = score;
                 best = e;
@@ -346,45 +527,82 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         return best;
     }
 
-    /** Approach and use the basic attack. */
+    /** Approach and use the basic attack, with footwork between swings. */
     protected void engage(ServerLevel level, LivingEntity t, double dist) {
         double range = attackRange() + t.getBbWidth() * 0.5;
-        getLookControl().setLookAt(t, 30, 30);
+        getLookControl().setLookAt(t, 40, 40);
         if (swing >= 0) {
             swing++;
             if (swing == attackWindup()) {
                 if (distanceTo(t) <= range + 1.5) basicAttack(level, t, combo);
                 combo = (combo + 1) % comboLength();
             }
-            if (swing >= attackWindup() + 4) swing = -1;
-            if (kind.flying) hover(t.position().add(0, preferredAltitude(), 0), 0.2);
+            if (swing >= attackWindup() + attackRecover()) swing = -1;
             return;
         }
         double want = preferredRange();
-        if (dist <= range && attackCooldown <= 0 && (isRanged() || dist <= range)) {
+        if (dist <= range && attackCooldown <= 0) {
             swing = 0;
             attackCooldown = attackInterval();
-            anim.play(ANIM_ATTACK + combo % 3);
-            if (!kind.flying) getNavigation().stop();
+            anim.play(ANIM_ATTACK + combo % 5);
+            getNavigation().stop();
+            faceTowards(t.position());
             return;
         }
-        if (kind.flying) {
-            Vec3 away = position().subtract(t.position()).multiply(1, 0, 1);
-            if (away.lengthSqr() < 0.01) away = new Vec3(1, 0, 0);
-            Vec3 dest = t.position().add(away.normalize().scale(Math.max(2, want))).add(0, preferredAltitude(), 0);
-            hover(dest, flySpeed());
-            return;
+        if (--strafeTimer <= 0) {
+            strafeTimer = 30 + random.nextInt(40);
+            strafeDir = random.nextBoolean() ? 1 : -1;
         }
-        if (--repath <= 0) {
-            repath = 8;
-            if (isRanged() && dist < want * 0.6) {
-                Vec3 away = position().subtract(t.position()).multiply(1, 0, 1).normalize().scale(4);
-                getNavigation().moveTo(getX() + away.x, getY(), getZ() + away.z, 1.2);
-            } else if (dist > want) {
-                getNavigation().moveTo(t, 1.15);
-            } else if (isRanged()) {
+        if (isRanged()) {
+            if (dist < want * 0.55) {
+                Vec3 away = position().subtract(t.position()).multiply(1, 0, 1).normalize().scale(5);
+                if (--repath <= 0) {
+                    repath = 8;
+                    getNavigation().moveTo(getX() + away.x, getY(), getZ() + away.z, 1.25);
+                }
+            } else if (dist > range * 0.95) {
+                if (--repath <= 0) {
+                    repath = 8;
+                    getNavigation().moveTo(t, 1.1);
+                }
+            } else {
                 getNavigation().stop();
+                getMoveControl().strafe(0, 0.35f * strafeDir);
+                faceTowards(t.position());
             }
+            return;
+        }
+        if (dist > range + 0.4) {
+            if (--repath <= 0) {
+                repath = 6;
+                getNavigation().moveTo(t, dist > 8 ? 1.25 : 1.1);
+            }
+        } else {
+            // in reach but waiting for the next swing: circle the target
+            getNavigation().stop();
+            getMoveControl().strafe(-0.1f, 0.3f * strafeDir);
+            faceTowards(t.position());
+        }
+    }
+
+    /** Fall back toward the core / a Sanctum, still facing the enemy. */
+    protected void fallBack(ServerLevel level) {
+        BlockPos core = SiegeManager.corePos(level);
+        Vec3 safe = core != null ? Vec3.atBottomCenterOf(core) : position();
+        for (LivingEntity a : SiegeDamage.defendersAround(level, position(), 24)) {
+            if (a instanceof TurretEntity t && t.kind == com.lastbastion.entity.turret.TurretKind.SANCTUM) {
+                safe = t.position();
+                break;
+            }
+        }
+        if (target != null) getLookControl().setLookAt(target, 30, 30);
+        if (position().distanceToSqr(safe) > 9) {
+            if (--repath <= 0) {
+                repath = 10;
+                getNavigation().moveTo(safe.x, safe.y, safe.z, 1.3);
+            }
+        } else if (target != null && distanceTo(target) < attackRange() + 1) {
+            engage(level, target, distanceTo(target));
         }
     }
 
@@ -403,8 +621,9 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             case FOLLOW -> {
                 if (owner != null) {
                     if (distanceToSqr(owner) > 28 * 28 && owner.level() == level()) {
+                        Vfx.spray(level, FxStyle.SMOKE, position().add(0, 1, 0), 0xB8B0A8, 0x8A8480, 0.7f, 10, 0.12f, 0);
                         teleportTo(owner.getX() + random.nextGaussian(), owner.getY(), owner.getZ() + random.nextGaussian());
-                        level.sendParticles(ParticleTypes.PORTAL, getX(), getY() + 1, getZ(), 20, 0.4, 0.6, 0.4, 0.1);
+                        Vfx.spray(level, FxStyle.STAR, position().add(0, 1, 0), 0xFFFFFF, kind.color, 0.25f, 12, 0.2f, 0);
                     }
                     dest = owner.position();
                     tolerance = 3 + getBbWidth();
@@ -419,10 +638,6 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             }
         }
         if (dest == null) return;
-        if (kind.flying) {
-            hover(dest.add(0, preferredAltitude(), 0), flySpeed() * 0.7);
-            return;
-        }
         if (position().distanceToSqr(dest) > tolerance * tolerance) {
             if (--repath <= 0) {
                 repath = 20;
@@ -430,43 +645,142 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             }
         } else {
             getNavigation().stop();
+            if (tickCount % 1200 == 600) speak(Lines.IDLE, false);
         }
-    }
-
-    /** Flight steering for airborne heroes. */
-    protected void hover(Vec3 dest, double speed) {
-        int ground = level().getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(dest.x), Mth.floor(dest.z));
-        if (dest.y < ground + 1.5) dest = new Vec3(dest.x, ground + 1.5, dest.z);
-        Vec3 v = dest.subtract(position());
-        Vec3 want = v.lengthSqr() < 0.04 ? Vec3.ZERO : v.normalize().scale(Math.min(speed, v.length() * 0.2));
-        setDeltaMovement(getDeltaMovement().scale(0.8).add(want.scale(0.25)));
-        Vec3 m = getDeltaMovement();
-        if (target != null) faceTowards(target.position());
-        else if (m.horizontalDistanceSqr() > 1e-3) faceTowards(position().add(m));
     }
 
     protected void faceTowards(Vec3 at) {
         double dx = at.x - getX(), dz = at.z - getZ();
+        if (dx * dx + dz * dz < 1e-4) return;
         float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
-        setYRot(Mth.rotLerp(0.3f, getYRot(), yaw));
+        setYRot(Mth.rotLerp(0.5f, getYRot(), yaw));
         yBodyRot = getYRot();
         yHeadRot = getYRot();
+    }
+
+    protected void faceNow(Vec3 at) {
+        double dx = at.x - getX(), dz = at.z - getZ();
+        if (dx * dx + dz * dz < 1e-4) return;
+        float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
+        setYRot(yaw);
+        yBodyRot = yaw;
+        yHeadRot = yaw;
     }
 
     protected Vec3 forward(double d) {
         return position().add(Vec3.directionFromRotation(0, getYRot()).scale(d));
     }
 
+    protected Vec3 look() {
+        return Vec3.directionFromRotation(0, getYRot());
+    }
+
+    // ------------------------------------------------------------------ situational helpers
+
+    protected List<LivingEntity> enemiesNear(ServerLevel level, double r) {
+        return SiegeDamage.enemiesAround(level, position(), r);
+    }
+
+    /** Number of living enemies within {@code r} of {@code at}. */
+    protected int crowd(ServerLevel level, Vec3 at, double r) {
+        return SiegeDamage.enemiesAround(level, at, r).size();
+    }
+
+    /** The position (an enemy's) that has the most other enemies within {@code r}, searching {@code range} around us. */
+    @Nullable
+    protected Vec3 bestCluster(ServerLevel level, double range, double r, int min) {
+        Vec3 best = null;
+        int bestN = min - 1;
+        for (LivingEntity e : SiegeDamage.enemiesAround(level, position(), range)) {
+            int n = crowd(level, e.position(), r);
+            if (n > bestN) {
+                bestN = n;
+                best = e.position();
+            }
+        }
+        return best;
+    }
+
+    /** Number of enemies within 4 blocks that are attacking this hero. */
+    protected int attackers(ServerLevel level) {
+        int n = 0;
+        for (LivingEntity e : SiegeDamage.enemiesAround(level, position(), 4)) {
+            if (e instanceof Mob mob && mob.getTarget() == this) n++;
+        }
+        return n;
+    }
+
+    /** First ally (not a turret) within {@code r} below {@code frac} health, or null. */
+    @Nullable
+    protected LivingEntity hurtAlly(ServerLevel level, double r, float frac) {
+        for (LivingEntity a : SiegeDamage.defendersAround(level, position(), r)) {
+            if (a instanceof TurretEntity) continue;
+            if (a.getHealth() < a.getMaxHealth() * frac) return a;
+        }
+        return null;
+    }
+
+    /** Melee helper: damage everything in a frontal arc of {@code arcDeg} within {@code reach}. */
+    protected int arc(ServerLevel level, double reach, double arcDeg, float damage, Element element) {
+        Vec3 look = look();
+        double cos = Math.cos(Math.toRadians(arcDeg / 2));
+        int n = 0;
+        for (LivingEntity e : SiegeDamage.enemiesAround(level, position(), reach + 1.5)) {
+            Vec3 to = e.position().subtract(position()).multiply(1, 0, 1);
+            double d = to.length();
+            if (d > reach + e.getBbWidth() * 0.5) continue;
+            if (d > 0.8 && to.normalize().dot(look) < cos) continue;
+            if (hit(e, damage, element)) n++;
+        }
+        return n;
+    }
+
+    /** Melee helper: damage everything in a small sphere in front. */
+    protected int cleave(ServerLevel level, double reach, double radius, float damage, Element element) {
+        Vec3 c = forward(reach).add(0, getBbHeight() * 0.5, 0);
+        int n = 0;
+        for (LivingEntity e : SiegeDamage.enemiesAround(level, c, radius)) {
+            if (hit(e, damage, element)) n++;
+        }
+        return n;
+    }
+
+    /** Hits everything along a horizontal line from here, width {@code w}. */
+    protected int line(ServerLevel level, Vec3 from, Vec3 dir, double length, double w, float damage, Element element) {
+        Vec3 n = dir.multiply(1, 0, 1).normalize();
+        int count = 0;
+        for (LivingEntity e : SiegeDamage.enemiesAround(level, from.add(n.scale(length / 2)), length / 2 + w)) {
+            Vec3 rel = e.position().subtract(from).multiply(1, 0, 1);
+            double along = rel.dot(n);
+            if (along < -0.5 || along > length) continue;
+            if (rel.subtract(n.scale(along)).lengthSqr() > (w + e.getBbWidth() / 2) * (w + e.getBbWidth() / 2)) continue;
+            if (hit(e, damage, element)) count++;
+        }
+        return count;
+    }
+
     // ------------------------------------------------------------------ hero-specific hooks
+
+    public abstract Role role();
 
     protected abstract void basicAttack(ServerLevel level, LivingEntity t, int combo);
 
     protected abstract int pickSkill(ServerLevel level, @Nullable LivingEntity t, double dist);
 
-    /** @return true when finished. */
+    /** @return true when finished. Skill id {@link #ULT} is the ultimate. */
     protected abstract boolean tickSkill(ServerLevel level, int skill, int t);
 
+    /** Is now a good moment for the ultimate? */
+    protected boolean wantsUltimate(ServerLevel level, @Nullable LivingEntity t, double dist) {
+        if (t == null) return false;
+        return crowd(level, t.position(), 5) >= 4 || (t instanceof SiegeEnemy se && se.isHighPriority() && dist < 12);
+    }
+
     protected void passiveTick(ServerLevel level) {
+    }
+
+    protected float retreatThreshold() {
+        return role() == Role.BRUISER ? 0.18f : 0.28f;
     }
 
     protected double attackRange() {
@@ -485,6 +799,10 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         return 7;
     }
 
+    protected int attackRecover() {
+        return 5;
+    }
+
     protected int attackInterval() {
         return 20;
     }
@@ -493,44 +811,27 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         return 1;
     }
 
-    protected double preferredAltitude() {
-        return 4;
-    }
-
-    protected double flySpeed() {
-        return 0.55;
-    }
-
-    /** Melee helper: damage everything in a small frontal arc. */
-    protected int cleave(ServerLevel level, double reach, double radius, float damage, Element element) {
-        Vec3 c = forward(reach).add(0, getBbHeight() * 0.5, 0);
-        int n = 0;
-        for (LivingEntity e : SiegeDamage.enemiesAround(level, c, radius)) {
-            if (SiegeDamage.deal(e, this, this, damage, element, false)) n++;
-        }
-        return n;
-    }
-
     // ------------------------------------------------------------------ lifecycle
 
     public void onWaveCleared() {
         setHealth(getMaxHealth());
-        if (level() instanceof ServerLevel sl) sl.sendParticles(ParticleTypes.HEART, getX(), getY() + getBbHeight(), getZ(), 5, 0.4, 0.2, 0.4, 0);
+        retreating = false;
+        if (level() instanceof ServerLevel sl) Vfx.spray(sl, FxStyle.STAR, position().add(0, getBbHeight(), 0), 0xFFFFFF, 0x9CFFB0, 0.25f, 10, 0.15f, 1);
     }
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
         if (source.getEntity() instanceof Player p && !p.isCreative()) return false;
-        if (kind.flying && source.is(net.minecraft.tags.DamageTypeTags.IS_FALL)) return false;
         if (source.is(net.minecraft.world.damagesource.DamageTypes.IN_WALL)) return false;
+        boolean low = getHealth() > getMaxHealth() * 0.3f;
         boolean r = super.hurt(source, amount);
-        if (r) lastDamaged = tickCount;
+        if (r) {
+            lastDamaged = tickCount;
+            lastCombat = tickCount;
+            gainUlt(Math.min(amount, 20) * 0.2f);
+            if (low && getHealth() <= getMaxHealth() * 0.3f) speak(Lines.LOW_HP, false);
+        }
         return r;
-    }
-
-    @Override
-    public boolean causeFallDamage(float d, float m, DamageSource s) {
-        return !kind.flying && super.causeFallDamage(d, m, s);
     }
 
     @Override
@@ -544,7 +845,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
                 sp.displayClientMessage(Component.literal(kind.title + " has fallen! Revive them at the Siege Core.")
                         .withStyle(ChatFormatting.RED), false);
             }
-            Fx.skyBeam(sl, position(), kind.color, 15, 0.8);
+            Vfx.pillar(sl, position(), kind.color, getBbWidth() * 0.6f, 15, 30);
+            Vfx.spray(sl, FxStyle.SOUL, position().add(0, getBbHeight() * 0.5, 0), 0xFFFFFF, kind.color, 0.4f, 16, 0.15f, 1);
         }
     }
 
@@ -581,6 +883,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         tag.putInt("lbMode", entityData.get(MODE));
         tag.putInt("lbLevel", heroLevel());
         tag.putInt("lbXp", xp());
+        tag.putFloat("lbUlt", ultEnergy());
     }
 
     @Override
@@ -589,6 +892,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         if (tag.hasUUID("lbOwner")) setOwnerId(tag.getUUID("lbOwner"));
         entityData.set(MODE, tag.getInt("lbMode"));
         setLevelAndXp(Math.max(1, tag.getInt("lbLevel")), tag.getInt("lbXp"));
+        entityData.set(ULT_ENERGY, tag.getFloat("lbUlt"));
     }
 
     @Override

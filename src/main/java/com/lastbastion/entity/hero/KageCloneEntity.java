@@ -43,9 +43,19 @@ public class KageCloneEntity extends KageHero {
     }
 
     @Override
+    protected boolean wantsUltimate(ServerLevel level, @Nullable LivingEntity t, double dist) {
+        return false;
+    }
+
+    @Override
+    protected String[] lines(Lines which) {
+        return new String[0];
+    }
+
+    @Override
     protected void passiveTick(ServerLevel level) {
         if (tickCount > 200) {
-            level.sendParticles(ParticleTypes.SQUID_INK, getX(), getY() + 1, getZ(), 20, 0.3, 0.6, 0.3, 0.05);
+            com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.SMOKE, position().add(0, 1, 0), 0x2A2A34, 0x0A0A10, 1f, 14, 0.15f, 0);
             discard();
         }
     }

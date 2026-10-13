@@ -89,6 +89,24 @@ public final class TurretModels {
         });
     }
 
+    /**
+     * A folded-open bird wing: an arm bone with a fan of primary feathers whose length peaks in the
+     * middle. {@code side} -1 extends toward -X (right), +1 toward +X (left).
+     */
+    static void wing(Part root, int side, float span, Paint feather) {
+        Paint bone = feather.copy().dark(0.92f);
+        root.box(side < 0 ? -span * 0.55f : 0, -0.6f, -0.4f, span * 0.55f, 1.2f, 0.8f, bone);
+        int n = 6;
+        for (int i = 0; i < n; i++) {
+            float t = i / (float) (n - 1);
+            float len = span * (0.55f + 0.5f * Mth.sin(t * Mth.PI * 0.85f + 0.3f));
+            float ang = Mth.lerp(t, -12, 62);
+            float x = side * span * 0.55f * t;
+            Part f = root.sub(x, 0, 0.05f * i).rot(0, 0, side < 0 ? ang : -ang);
+            f.box(side < 0 ? -len : 0, -0.55f, -0.18f, len, 1.1f, 0.36f, feather);
+        }
+    }
+
     /** Four little rivet heads on a face plane (z fixed) of a box. */
     static void rivets(Part p, float x0, float y0, float x1, float y1, float z, Paint paint) {
         float r = 0.5f;
@@ -728,9 +746,9 @@ public final class TurretModels {
         yaw.taper(0, 0, 0, 5, 5, 3, 3, 16, 4, runed);
         yaw.taper(0, -16, 0, 3, 3, 0.4f, 0.4f, 3, 3, gold);
         yaw.octo(0, -1, 0, 6, 1, 6, gold);
-        Part wings = yaw.sub(0, -10, 1.8f).from(3);
-        wings.sub(-1.4f, 0, 0).rot(0, 15, -20).box(-9, -1, -0.4f, 9, 7, 0.8f, feather).sub(-9, 0, 0).rot(0, 0, 20).box(-4, -0.5f, -0.3f, 4, 4, 0.6f, feather);
-        wings.sub(1.4f, 0, 0).rot(0, -15, 20).box(0, -1, -0.4f, 9, 7, 0.8f, feather).sub(9, 0, 0).rot(0, 0, -20).box(0, -0.5f, -0.3f, 4, 4, 0.6f, feather);
+        Part wings = yaw.sub(0, -11, 1.6f).from(3);
+        wing(wings.sub(-1.5f, 0, 0).rot(0, 20, 0), -1, 7f, feather);
+        wing(wings.sub(1.5f, 0, 0).rot(0, -20, 0), 1, 7f, feather);
         Part gun = yaw.child("gun", 0, -23, 0);
         Part halo = gun.child("halo", 0, 0, 0).levels(1, 4);
         halo.octoRing(-0.3f, 9, 0.7f, 0.6f, holy);
@@ -751,8 +769,8 @@ public final class TurretModels {
         sword.box(-0.4f, 0, -1.2f, 0.8f, 0.6f, 2.4f, gold);
         sword.box(-0.25f, 0.6f, -0.5f, 0.5f, 9, 1, holy);
         angel.sub(-2, -6.5f, 0).rot(-30, 0, 20).box(-0.5f, 0, -0.5f, 1, 4, 1, statue);
-        angel.sub(-1, -6, 1).rot(0, 30, -30).box(-7, -2, -0.3f, 7, 6, 0.6f, feather);
-        angel.sub(1, -6, 1).rot(0, -30, 30).box(0, -2, -0.3f, 7, 6, 0.6f, feather);
+        wing(angel.sub(-1, -6, 1).rot(0, 25, 0), -1, 5.5f, feather);
+        wing(angel.sub(1, -6, 1).rot(0, -25, 0), 1, 5.5f, feather);
         // Lv5 B: Sanctuary: columned canopy with dome, bell and a radiant heart
         Part sanct = yaw.child("sanct", 0, 0, 0).levels(6, 6);
         for (int i = 0; i < 4; i++) {

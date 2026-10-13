@@ -39,6 +39,27 @@ public final class ClientSiegeState {
         if (displayedCoreHp < 0) displayedCoreHp = p.coreHp();
     }
 
+    public static final class Speech {
+        public final int entity;
+        public final String text;
+        public final int color;
+        public int age;
+
+        Speech(int entity, String text, int color) {
+            this.entity = entity;
+            this.text = text;
+            this.color = color;
+        }
+    }
+
+    public static final List<Speech> SPEECH = new ArrayList<>();
+
+    public static void speech(int entity, String text, int color) {
+        SPEECH.removeIf(s -> s.entity == entity);
+        if (SPEECH.size() > 12) SPEECH.remove(0);
+        SPEECH.add(new Speech(entity, text, color));
+    }
+
     public static void popup(Vec3 pos, int amount) {
         if (POPUPS.size() > 60) POPUPS.remove(0);
         POPUPS.add(new Popup(pos, amount));
@@ -50,6 +71,7 @@ public final class ClientSiegeState {
             Popup p = it.next();
             if (++p.age > 30) it.remove();
         }
+        SPEECH.removeIf(sp -> ++sp.age > 70);
         if (creditFlash > 0) creditFlash--;
         if (hud != null) displayedCoreHp += (hud.coreHp() - displayedCoreHp) * 0.15f;
     }

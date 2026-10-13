@@ -95,7 +95,7 @@ public final class ShopCatalog {
         }
         for (HeroKind k : HeroKind.values()) {
             l.add(new Entry("hero_" + k.id, Category.HEROES, k.title, k.cost, stack(ModItems.HERO_SIGILS.get(k), 1), stack(ModItems.HERO_SIGILS.get(k), 1), null,
-                    k.desc, "HP " + (int) k.hp + "   Damage " + (int) k.damage + (k.flying ? "   Flies" : ""), k.moves));
+                    k.desc, "HP " + (int) k.hp + "   Damage " + (int) k.damage + "   Role: " + k.role.name().charAt(0) + k.role.name().substring(1).toLowerCase(), k.moves));
         }
         int[] gunCosts = {600, 450, 900, 1400, 700, 800, 750, 650};
         for (GunItem.GunKind g : GunItem.GunKind.values()) {

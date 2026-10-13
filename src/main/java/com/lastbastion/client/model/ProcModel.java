@@ -27,6 +27,8 @@ public class ProcModel<T extends Entity> extends EntityModel<T> {
     public int level = 1;
     public float tintR = 1, tintG = 1, tintB = 1, alpha = 1;
     public float partialTick;
+    /** Per-model scratch object for animation helpers (e.g. a cached {@link Poser}). */
+    public Object poserCache;
 
     public ProcModel(ModelSpec.Baked baked, Animator<T> animator) {
         this(baked, animator, RenderType::entityCutoutNoCull);
