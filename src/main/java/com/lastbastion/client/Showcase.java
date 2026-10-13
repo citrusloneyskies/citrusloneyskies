@@ -115,7 +115,7 @@ public final class Showcase {
                         stage = 4;
                         MinecraftServer server = mc.getSingleplayerServer();
                         if (server != null) server.execute(() -> startBattle(server));
-                        moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 9, -16), 0, 22));
+                        moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 18, -28), 0, 28));
                     } else {
                         moveTo(mc, SHOTS.get(shot));
                     }

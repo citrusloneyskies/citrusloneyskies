@@ -5,6 +5,19 @@ zombie siege that comes every night from every direction and gets harder each wa
 You spend them at the core on turrets, heroes, weapons, call-ins and fortifications. If the core falls,
 the siege starts again from wave 1.
 
+## Screenshots
+These are taken automatically by CI (`[showcase]` commits launch the real client headless and photograph every model):
+
+| | |
+|---|---|
+| ![Zombies, rank I](docs/screenshots/01_zombies_rank1_a.jpg) | ![Zombies, rank V (Abyssal)](docs/screenshots/03_zombies_rank5_a.jpg) |
+| ![Zombies, rank I (2)](docs/screenshots/02_zombies_rank1_b.jpg) | ![Zombies, rank V (2)](docs/screenshots/04_zombies_rank5_b.jpg) |
+| ![Heroes](docs/screenshots/05_heroes_a.jpg) | ![Heroes: Zeus, Vorthax, Ignis, AEGIS-7](docs/screenshots/06_heroes_b.jpg) |
+| ![Turrets Lv1 / Lv5](docs/screenshots/07_turrets_a.jpg) | ![Turrets Lv1 / Lv5 (2)](docs/screenshots/08_turrets_b.jpg) |
+| ![Bosses](docs/screenshots/09_bosses_a.jpg) | ![Bosses (2)](docs/screenshots/10_bosses_b.jpg) |
+| ![Morvathrax and Varkhul](docs/screenshots/11_bosses_c.jpg) | ![Siege Core](docs/screenshots/12_core.jpg) |
+| ![Battle](docs/screenshots/15_battle_c.jpg) | ![Battle (2)](docs/screenshots/14_battle_b.jpg) |
+
 ## Installing
 1. Install **Forge 1.20.1** (47.3.0 or newer).
 2. Build the jar with `./gradlew build` (or grab `lastbastion-jar` from the latest GitHub Actions run). The jar is
