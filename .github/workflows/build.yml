@@ -76,7 +76,8 @@ jobs:
         run: |
           mkdir -p run
           printf 'onboardAccessibility:false\nrenderDistance:8\nsimulationDistance:8\nguiScale:2\ntutorialStep:none\nskipMultiplayerWarning:true\njoinedFirstServer:true\nsoundCategory_master:0.0\n' > run/options.txt
-          timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClient --console=plain > client.log 2>&1 || echo "client exited with $?"
+          mkdir -p run/config && printf 'earlyWindowControl = false\n' > run/config/fml.toml
+          timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClient --console=plain < /dev/null > client.log 2>&1 || echo "client exited with $?"
           ls -la run/screenshots || true
 
       - name: Client errors
