@@ -70,7 +70,8 @@ public final class VfxManager {
     // ------------------------------------------------------------------ rendering
 
     public static void render(RenderLevelStageEvent e) {
-        if (ACTIVE.isEmpty()) return;
+        boolean dome = coreDomeVisible();
+        if (ACTIVE.isEmpty() && !dome) return;
         Minecraft mc = Minecraft.getInstance();
         Camera cam = e.getCamera();
         Vec3 cp = cam.getPosition();
@@ -110,6 +111,7 @@ public final class VfxManager {
                 }
             }
         }
+        if (dome) coreDome(d, pt);
         buf.endBatch(VfxRenderTypes.ADDITIVE);
     }
 
@@ -393,6 +395,41 @@ public final class VfxManager {
             }
         }
         d.annulus(c, R * 0.96f, R * 1.03f, 0.06f, fx.p.color2(), 0.5f * fade, 0.5f * fade, 0, Mth.TWO_PI, 48);
+    }
+
+    // ------------------------------------------------------------------ the core's barrier
+
+    private static boolean coreDomeVisible() {
+        if (!com.lastbastion.client.ClientSiegeState.active()) return false;
+        if (com.lastbastion.client.ClientSiegeState.shieldFraction() <= 0.01f && !com.lastbastion.client.ClientSiegeState.aegis()) return false;
+        net.minecraft.core.BlockPos cp = com.lastbastion.client.ClientSiegeState.corePos();
+        if (cp.equals(net.minecraft.core.BlockPos.ZERO) || Minecraft.getInstance().player == null) return false;
+        return Minecraft.getInstance().player.position().distanceToSqr(Vec3.atCenterOf(cp)) < 128 * 128;
+    }
+
+    /** Persistent hex-shimmer barrier over the core while it has shield (bright white-blue during Aegis). */
+    private static void coreDome(Draw d, float pt) {
+        Vec3 c = Vec3.atBottomCenterOf(com.lastbastion.client.ClientSiegeState.corePos());
+        boolean aegis = com.lastbastion.client.ClientSiegeState.aegis();
+        float sh = com.lastbastion.client.ClientSiegeState.shieldFraction();
+        float strength = aegis ? 1.1f : 0.25f + 0.55f * sh;
+        int color = aegis ? 0x9FE0FF : 0x3A9ACF;
+        float R = 3.2f;
+        float time = clientTicks + pt;
+        int lat = 9, lon = 32;
+        float ripple = (time * 0.025f) % 1f;
+        for (int i = 0; i < lat; i++) {
+            float p0 = Mth.HALF_PI * i / lat, p1 = Mth.HALF_PI * (i + 1) / lat;
+            for (int j = 0; j < lon; j++) {
+                float q0 = Mth.TWO_PI * j / lon + time * 0.004f, q1 = Mth.TWO_PI * (j + 1) / lon + time * 0.004f;
+                Vector3f v00 = sph(d, c, R, p0, q0), v01 = sph(d, c, R, p0, q1), v11 = sph(d, c, R, p1, q1), v10 = sph(d, c, R, p1, q0);
+                float hex = ((i + j) % 2 == 0) ? 1f : 0.7f;
+                float k = strength * hex * 0.55f;
+                d.quad(v00, v01, v11, v10, color, domeAlpha(v00, c, d, p0, ripple) * k, domeAlpha(v01, c, d, p0, ripple) * k,
+                        domeAlpha(v11, c, d, p1, ripple) * k, domeAlpha(v10, c, d, p1, ripple) * k);
+            }
+        }
+        d.annulus(c, R * 0.97f, R * 1.04f, 0.06f, 0x6FE3FF, 0.45f * strength, 0.45f * strength, 0, Mth.TWO_PI, 48);
     }
 
     private static Vector3f sph(Draw d, Vec3 c, float r, float phi, float theta) {

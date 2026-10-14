@@ -10,10 +10,10 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 public record HudSyncPacket(int state, int wave, float coreHp, float coreMax, float shield, float shieldMax, int remaining, int total,
-                            int modifier, int credits, int toNight, BlockPos corePos, int bestWave, int[] upgrades) {
+                            int modifier, int credits, int toNight, BlockPos corePos, int bestWave, int[] upgrades, int[] abilityCd, int aegis) {
     public HudSyncPacket(FriendlyByteBuf b) {
         this(b.readVarInt(), b.readVarInt(), b.readFloat(), b.readFloat(), b.readFloat(), b.readFloat(), b.readVarInt(), b.readVarInt(),
-                b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBlockPos(), b.readVarInt(), b.readVarIntArray());
+                b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBlockPos(), b.readVarInt(), b.readVarIntArray(), b.readVarIntArray(), b.readVarInt());
     }
 
     public void encode(FriendlyByteBuf b) {
@@ -31,6 +31,8 @@ public record HudSyncPacket(int state, int wave, float coreHp, float coreMax, fl
         b.writeBlockPos(corePos);
         b.writeVarInt(bestWave);
         b.writeVarIntArray(upgrades);
+        b.writeVarIntArray(abilityCd);
+        b.writeVarInt(aegis);
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {

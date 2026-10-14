@@ -188,4 +188,35 @@ public final class SiegeGameTests {
         if (left == 2000 - 150 - 300 && hasKit && fort == 1) h.succeed();
         else h.fail("shop mismatch: credits=" + left + " kit=" + hasKit + " fortify=" + fort);
     }
+
+    @GameTest(template = "arena", timeoutTicks = 80, batch = "siege_protocols")
+    public static void coreProtocols(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        SiegeData d = SiegeManager.data(level);
+        for (com.lastbastion.siege.CoreUpgrade u : com.lastbastion.siege.CoreUpgrade.values()) d.upgrades[u.ordinal()] = 1;
+        net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "protocol_tester"));
+        p.moveTo(core.getX() + 2.5, core.getY(), core.getZ() + 0.5);
+        for (int i = 0; i < 4; i++) ZombieSpawner.spawn(level, ZombieKind.SHAMBLER, ZombieRank.ROTTEN, 0, ring(core, 5, i, 4), false, false);
+        StringBuilder fails = new StringBuilder();
+        for (com.lastbastion.siege.CoreAbility a : com.lastbastion.siege.CoreAbility.values()) {
+            SiegeManager.useAbility(level, p, a);
+            if (d.abilityCd[a.ordinal()] <= 0) fails.append(a.name()).append(" did not trigger; ");
+        }
+        float before = d.coreHp;
+        SiegeManager.damageCore(level, 50, null);
+        if (d.coreHp != before) fails.append("aegis did not block damage; ");
+        com.lastbastion.siege.CoreAbility again = com.lastbastion.siege.CoreAbility.NOVA;
+        int cd = d.abilityCd[again.ordinal()];
+        SiegeManager.useAbility(level, p, again);
+        if (d.abilityCd[again.ordinal()] != cd) fails.append("cooldown ignored; ");
+        teardown(h, core);
+        java.util.Arrays.fill(d.upgrades, 0);
+        java.util.Arrays.fill(d.abilityCd, 0);
+        d.aegisTicks = 0;
+        d.overdriveTicks = 0;
+        if (fails.length() == 0) h.succeed();
+        else h.fail(fails.toString());
+    }
 }

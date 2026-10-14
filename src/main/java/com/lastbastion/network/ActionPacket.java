@@ -21,7 +21,7 @@ import java.util.function.Supplier;
 /** All client -> server UI actions: shop purchases, turret console, hero orders, calling the next wave. */
 public record ActionPacket(int action, int target, String id) {
     public static final int BUY = 0, TURRET_UPGRADE = 1, TURRET_SELL = 2, TURRET_REPAIR = 3, TURRET_MODE = 4,
-            HERO_MODE = 5, HERO_DISMISS = 6, CALL_WAVE = 7, ALL_HEROES_MODE = 8, REFRESH_CORE = 9;
+            HERO_MODE = 5, HERO_DISMISS = 6, CALL_WAVE = 7, ALL_HEROES_MODE = 8, REFRESH_CORE = 9, CORE_ABILITY = 10;
 
     public ActionPacket(FriendlyByteBuf b) {
         this(b.readVarInt(), b.readVarInt(), b.readUtf(64));
@@ -98,6 +98,10 @@ public record ActionPacket(int action, int target, String id) {
                 p.displayClientMessage(Component.literal(n + " heroes ordered to: " + m.title).withStyle(ChatFormatting.AQUA), true);
             }
             case CALL_WAVE -> SiegeManager.callWaveEarly(level, p);
+            case CORE_ABILITY -> {
+                com.lastbastion.siege.CoreAbility a = com.lastbastion.siege.CoreAbility.byName(id);
+                if (a != null) p.displayClientMessage(SiegeManager.useAbility(level, p, a), true);
+            }
             default -> {
             }
         }

@@ -39,6 +39,10 @@ public class SiegeData extends SavedData {
     public int waveTotal;
     public int waveKilled;
     public int pulseCooldown;
+    /** Core Protocol cooldowns in ticks, indexed by {@link CoreAbility#ordinal()}. */
+    public final int[] abilityCd = new int[CoreAbility.values().length];
+    public int aegisTicks;
+    public int overdriveTicks;
     public int lastHitTick;
     public boolean calledEarly;
     public boolean bossAlive;
@@ -117,6 +121,8 @@ public class SiegeData extends SavedData {
         d.waveTotal = tag.getInt("waveTotal");
         d.waveKilled = tag.getInt("waveKilled");
         d.pulseCooldown = tag.getInt("pulseCd");
+        int[] cds = tag.getIntArray("abilityCd");
+        System.arraycopy(cds, 0, d.abilityCd, 0, Math.min(cds.length, d.abilityCd.length));
         d.calledEarly = tag.getBoolean("early");
         return d;
     }
@@ -165,6 +171,7 @@ public class SiegeData extends SavedData {
         tag.putInt("waveTotal", waveTotal);
         tag.putInt("waveKilled", waveKilled);
         tag.putInt("pulseCd", pulseCooldown);
+        tag.putIntArray("abilityCd", abilityCd);
         tag.putBoolean("early", calledEarly);
         return tag;
     }

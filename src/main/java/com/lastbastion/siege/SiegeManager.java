@@ -6,6 +6,8 @@ import com.lastbastion.combat.SiegeDamage;
 import com.lastbastion.combat.SiegeEnemy;
 import com.lastbastion.config.SiegeConfig;
 import com.lastbastion.entity.boss.BossKind;
+import com.lastbastion.fx.FxStyle;
+import com.lastbastion.fx.Vfx;
 import com.lastbastion.entity.boss.SiegeBoss;
 import com.lastbastion.entity.hero.HeroEntity;
 import com.lastbastion.entity.turret.TurretEntity;
@@ -155,7 +157,18 @@ public final class SiegeManager {
             if (maxShield > 0 && level.getGameTime() - d.lastHitTick > 100) d.shield = Math.min(maxShield, d.shield + maxShield * 0.04f);
             if (d.state == SiegeState.PREPARING) d.coreHp = Math.min(d.maxHp(), d.coreHp + d.maxHp() * 0.005f);
             if (d.pulseCooldown > 0) d.pulseCooldown = Math.max(0, d.pulseCooldown - 20);
+            for (int i = 0; i < d.abilityCd.length; i++) d.abilityCd[i] = Math.max(0, d.abilityCd[i] - 20);
+            if (d.aegisTicks > 0) Vfx.dome(level, Vec3.atBottomCenterOf(core), 0x8FD8FF, 3.4f, 22, null);
             d.setDirty();
+        }
+        if (d.aegisTicks > 0) d.aegisTicks--;
+        if (d.overdriveTicks > 0) d.overdriveTicks--;
+        if (d.state == SiegeState.WAVE && present) {
+            if (gt % 30 == 0) sentinel(level, d, core);
+            if (gt % 40 == 0 && d.coreHp < d.maxHp() * 0.25f) {
+                Vfx.ring(level, Vec3.atBottomCenterOf(core).add(0, 0.1, 0), 0xFF3020, 4.5f, 16, 0.6f);
+                level.playSound(null, core, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS, 1.5f, 0.5f);
+            }
         }
         int beacon = d.level(CoreUpgrade.BEACON);
         if (beacon > 0 && gt % 40 == 0) {
@@ -355,7 +368,24 @@ public final class SiegeManager {
         SiegeData d = data(level);
         if (!isCoreLevel(level, d) || d.corePos == null || amount <= 0) return;
         Vec3 c = Vec3.atCenterOf(d.corePos);
-        d.lastHitTick = (int) level.getGameTime();
+        if (d.aegisTicks > 0) {
+            Vfx.flash(level, c.add(0, 1.6, 0), 0x8FD8FF, 1.2f, 4);
+            level.playSound(null, d.corePos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1f, 1.4f);
+            return;
+        }
+        long now = level.getGameTime();
+        boolean fx = now - lastCoreFx > 6;
+        if (fx) lastCoreFx = now;
+        d.lastHitTick = (int) now;
+        if (d.shield > 0 && fx) {
+            Vfx.dome(level, Vec3.atBottomCenterOf(d.corePos), 0x6FE3FF, 3.2f, 10, null);
+            Vfx.spray(level, FxStyle.SHARD, c.add(0, 0.8, 0), 0xBFF4FF, 0x6FE3FF, 0.2f, 6, 0.3f, 0.3f);
+        }
+        if (d.shield <= 0 && amount > 0 && fx) {
+            Vfx.flash(level, c.add(0, 1.6, 0), 0xFF4030, 1.4f, 5);
+            Vfx.spray(level, FxStyle.SPARK, c.add(0, 1.4, 0), 0xFFE0A0, 0xFF6030, 0.18f, 10, 0.35f, 0.4f);
+            if (amount > d.maxHp() * 0.03f) Vfx.shake(level, c, 0.35f, 12, 6);
+        }
         if (d.shield > 0) {
             float absorbed = Math.min(d.shield, amount);
             d.shield -= absorbed;
@@ -395,6 +425,11 @@ public final class SiegeManager {
         if (core == null) return;
         Vec3 c = Vec3.atCenterOf(core);
         int reached = d.wave;
+        Vfx.sphere(level, c.add(0, 1.5, 0), 0x6FE3FF, 9f, 24);
+        Vfx.pillar(level, Vec3.atBottomCenterOf(core), 0xFF4030, 2.2f, 30, 40);
+        Vfx.spray(level, FxStyle.SHARD, c.add(0, 1.5, 0), 0xBFF4FF, 0x6FE3FF, 0.45f, 60, 0.8f, 0.4f);
+        Vfx.screenFlash(level, c, 0xFF4030, 0.45f, 120, 30);
+        Vfx.shake(level, c, 1.6f, 80, 30);
         Fx.explosion(level, c, 6);
         Fx.shockwave(level, c, 10, 0x8B0000);
         level.playSound(null, core, SoundEvents.WITHER_DEATH, SoundSource.BLOCKS, 2f, 0.6f);
@@ -514,6 +549,116 @@ public final class SiegeManager {
 
     // ------------------------------------------------------------------ messaging
 
+    private static long lastCoreFx;
+
+    /** Visual/strength tier of the core, 1..5, from the total number of core upgrade levels bought. */
+    public static int coreTier(SiegeData d) {
+        int sum = 0;
+        for (int u : d.upgrades) sum += u;
+        return Math.min(5, 1 + sum / 4);
+    }
+
+    /** True while Turret Overdrive is running. */
+    public static boolean overdrive(ServerLevel level) {
+        return data(level).overdriveTicks > 0;
+    }
+
+    /** The core's passive defence: an arc of energy at the nearest enemy, stronger with each tier. */
+    private static void sentinel(ServerLevel level, SiegeData d, BlockPos core) {
+        int tier = coreTier(d);
+        Vec3 top = Vec3.atBottomCenterOf(core).add(0, 2.4, 0);
+        LivingEntity best = null;
+        double bestD = Double.MAX_VALUE;
+        for (LivingEntity e : SiegeDamage.enemiesAround(level, top, 6 + tier)) {
+            double dd = e.distanceToSqr(top);
+            if (dd < bestD) {
+                bestD = dd;
+                best = e;
+            }
+        }
+        if (best == null) return;
+        Vfx.arc(level, top, best.position().add(0, best.getBbHeight() * 0.5, 0), 0x6FE3FF, 0.06f, 6, 0.5f);
+        Vfx.flash(level, best.position().add(0, best.getBbHeight() * 0.5, 0), 0x6FE3FF, 0.6f, 4);
+        SiegeDamage.deal(best, null, null, 5f + 3f * tier, Element.ARCANE, false);
+        level.playSound(null, core, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 0.8f, 1.6f);
+    }
+
+    /** Trigger a Core Protocol. Returns the feedback message. */
+    public static Component useAbility(ServerLevel level, ServerPlayer p, CoreAbility a) {
+        SiegeData d = data(level);
+        BlockPos core = corePos(level);
+        if (core == null || d.state == SiegeState.INACTIVE) return Component.literal("No active Siege Core.").withStyle(ChatFormatting.RED);
+        Vec3 c = Vec3.atBottomCenterOf(core);
+        if (p.position().distanceToSqr(c) > 48 * 48) return Component.literal("You must be within 48 blocks of the core.").withStyle(ChatFormatting.RED);
+        if (!a.unlocked(d.upgrades)) {
+            return Component.literal(a.title + " requires " + (a.requires == null ? "" : a.requires.title) + " " + a.requiredLevel + ".").withStyle(ChatFormatting.RED);
+        }
+        int cd = d.abilityCd[a.ordinal()];
+        if (cd > 0) return Component.literal(a.title + " is recharging (" + (cd + 19) / 20 + "s).").withStyle(ChatFormatting.YELLOW);
+        Vec3 top = c.add(0, 2.4, 0);
+        int tier = coreTier(d);
+        switch (a) {
+            case NOVA -> {
+                Vfx.sphere(level, top, 0x6FE3FF, 8f, 14);
+                Vfx.ring(level, c.add(0, 0.1, 0), 0x6FE3FF, 8, 16, 1.6f);
+                Vfx.flash(level, top, 0xFFFFFF, 3f, 8);
+                Vfx.shake(level, c, 0.6f, 20, 10);
+                level.playSound(null, core, SoundEvents.WARDEN_SONIC_BOOM, SoundSource.BLOCKS, 2f, 1.3f);
+                for (LivingEntity e : SiegeDamage.enemiesAround(level, c, 8)) {
+                    float dmg = 40 + 15 * tier;
+                    if (e instanceof SiegeBoss) dmg *= 0.5f;
+                    SiegeDamage.deal(e, p, p, dmg, Element.ARCANE, false);
+                    SiegeDamage.push(e, c, 1.8, 0.6);
+                }
+            }
+            case AEGIS -> {
+                d.shield = Math.min(d.maxShield(), d.shield + d.maxShield() * 0.5f);
+                d.aegisTicks = 120;
+                Vfx.dome(level, c, 0x8FD8FF, 3.4f, 24, null);
+                Vfx.pillar(level, c, 0x8FD8FF, 1.6f, 10, 20);
+                level.playSound(null, core, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 2f, 1.2f);
+            }
+            case OVERDRIVE -> {
+                d.overdriveTicks = 240;
+                for (Entity e : level.getEntities((Entity) null, new net.minecraft.world.phys.AABB(c, c).inflate(32), e -> e instanceof TurretEntity)) {
+                    Vfx.arc(level, top, e.position().add(0, e.getBbHeight() * 0.7, 0), 0xFFB040, 0.07f, 10, 0.6f);
+                    Vfx.spray(level, FxStyle.SPARK, e.position().add(0, e.getBbHeight() * 0.7, 0), 0xFFE0A0, 0xFFB040, 0.2f, 10, 0.3f, 0.6f);
+                }
+                level.playSound(null, core, SoundEvents.BEACON_POWER_SELECT, SoundSource.BLOCKS, 2f, 1.5f);
+            }
+            case LANCE -> {
+                List<LivingEntity> foes = new ArrayList<>(SiegeDamage.enemiesAround(level, c, 36));
+                foes.sort((x, y) -> Float.compare(y.getHealth(), x.getHealth()));
+                for (int i = 0; i < Math.min(6, foes.size()); i++) {
+                    LivingEntity e = foes.get(i);
+                    Vec3 at = e.position().add(0, e.getBbHeight() * 0.5, 0);
+                    Vfx.beam(level, top, at, 0xFFE070, 0.35f, 14, 0.05f);
+                    Vfx.flash(level, at, 0xFFF4C0, 1.6f, 8);
+                    SiegeDamage.deal(e, p, p, (60 + 20 * tier) * (e instanceof SiegeBoss ? 0.6f : 1f), Element.HOLY, false);
+                }
+                Vfx.flash(level, top, 0xFFE070, 2.5f, 10);
+                level.playSound(null, core, SoundEvents.BEACON_POWER_SELECT, SoundSource.BLOCKS, 2f, 0.7f);
+                level.playSound(null, core, SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.BLOCKS, 1f, 1.6f);
+            }
+            case RALLY -> {
+                for (LivingEntity e : SiegeDamage.defendersAround(level, c, 24)) {
+                    if (e instanceof TurretEntity) continue;
+                    e.heal(e.getMaxHealth() * 0.4f);
+                    e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, 200, 1));
+                    e.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 200, 0));
+                    Vfx.spray(level, FxStyle.STAR, e.position().add(0, 1, 0), 0xFFE0E0, 0xFF6060, 0.25f, 8, 0.15f, 0.8f);
+                }
+                Vfx.ring(level, c.add(0, 0.1, 0), 0xFF6060, 24, 20, 1.2f);
+                level.playSound(null, core, SoundEvents.RAID_HORN.value(), SoundSource.BLOCKS, 2f, 1.2f);
+            }
+        }
+        d.abilityCd[a.ordinal()] = a.cooldownSeconds * 20;
+        d.setDirty();
+        syncHud(level, d);
+        broadcast(level, d, Component.literal(p.getName().getString() + " activated " + a.title + "!").withStyle(s -> s.withColor(a.color)));
+        return Component.literal(a.title + " activated.").withStyle(s -> s.withColor(a.color));
+    }
+
     public static void syncHud(ServerLevel level, SiegeData d) {
         long t = level.getDayTime() % 24000L;
         int toNight = (int) (t < 13000 ? 13000 - t : 24000 - t + 13000);
@@ -525,8 +670,14 @@ public final class SiegeManager {
                     && p.position().distanceToSqr(Vec3.atCenterOf(d.corePos)) < 400 * 400;
             Net.sendTo(p, new HudSyncPacket(here ? d.state.ordinal() : 0, d.wave, d.coreHp, d.maxHp(), d.shield, d.maxShield(),
                     remaining, d.waveTotal, d.modifier.ordinal(), d.credits(p.getUUID()), toNight,
-                    here && d.corePos != null ? d.corePos : BlockPos.ZERO, d.bestWave, d.upgrades.clone()));
+                    here && d.corePos != null ? d.corePos : BlockPos.ZERO, d.bestWave, d.upgrades.clone(), cooldownSeconds(d), d.aegisTicks));
         }
+    }
+
+    private static int[] cooldownSeconds(SiegeData d) {
+        int[] out = new int[d.abilityCd.length];
+        for (int i = 0; i < out.length; i++) out[i] = (d.abilityCd[i] + 19) / 20;
+        return out;
     }
 
     public static void broadcast(ServerLevel level, SiegeData d, Component msg) {

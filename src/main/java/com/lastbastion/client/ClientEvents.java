@@ -41,6 +41,9 @@ public final class ClientEvents {
         while (ClientSetup.HERO_COMMAND.consumeClick()) {
             if (mc.screen == null) mc.setScreen(new HeroCommandScreen());
         }
+        while (ClientSetup.PROTOCOLS.consumeClick()) {
+            if (mc.screen == null && ClientSiegeState.active()) mc.setScreen(new com.lastbastion.client.screen.ProtocolScreen());
+        }
         if (mc.player.getVehicle() instanceof TitanExoEntity exo) {
             boolean fire = mc.options.keyAttack.isDown() && mc.screen == null;
             boolean missile = mc.options.keyUse.isDown() && mc.screen == null;

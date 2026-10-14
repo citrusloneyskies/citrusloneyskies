@@ -317,6 +317,7 @@ public class TurretEntity extends Mob implements SiegeAlly {
         if (level() instanceof ServerLevel sl) {
             int oc = SiegeManager.data(sl).level(CoreUpgrade.OVERCLOCK);
             cd = Math.max(1, Math.round(cd * (1f - 0.06f * oc)));
+            if (SiegeManager.overdrive(sl)) cd = Math.max(1, Math.round(cd * 0.667f));
         }
         return cd;
     }

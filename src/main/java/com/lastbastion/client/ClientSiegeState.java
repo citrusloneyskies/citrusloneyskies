@@ -108,6 +108,15 @@ public final class ClientSiegeState {
         return hud == null ? new int[16] : hud.upgrades();
     }
 
+    /** Seconds until each Core Protocol is ready (0 = ready). */
+    public static int abilityCooldown(int i) {
+        return hud == null || hud.abilityCd() == null || i >= hud.abilityCd().length ? 0 : hud.abilityCd()[i];
+    }
+
+    public static boolean aegis() {
+        return hud != null && hud.aegis() > 0;
+    }
+
     public static int wave() {
         return hud == null ? 1 : hud.wave();
     }

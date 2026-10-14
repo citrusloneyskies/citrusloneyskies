@@ -28,6 +28,8 @@ import org.lwjgl.glfw.GLFW;
 public final class ClientSetup {
     public static final KeyMapping HERO_COMMAND = new KeyMapping("key.lastbastion.hero_command", InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_G, "key.categories.lastbastion");
+    public static final KeyMapping PROTOCOLS = new KeyMapping("key.lastbastion.protocols", InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_V, "key.categories.lastbastion");
 
     private ClientSetup() {
     }
@@ -62,5 +64,6 @@ public final class ClientSetup {
     @SubscribeEvent
     public static void keys(RegisterKeyMappingsEvent e) {
         e.register(HERO_COMMAND);
+        e.register(PROTOCOLS);
     }
 }

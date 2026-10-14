@@ -88,6 +88,9 @@ public class CoreScreen extends Screen {
         }).bounds(x, y, w - 100, 20).build();
         horn.active = ClientSiegeState.state() == SiegeState.PREPARING;
         dynamic.add(addRenderableWidget(horn));
+        y += 22;
+        dynamic.add(addRenderableWidget(Button.builder(Component.literal("Core Protocols (abilities) - also on key V"),
+                b -> Minecraft.getInstance().setScreen(new ProtocolScreen())).bounds(x, y, w - 100, 20).build()));
         y += 26;
         int bw = (w - 100 - 8) / 3;
         for (int i = 0; i < HeroMode.values().length; i++) {
@@ -95,8 +98,9 @@ public class CoreScreen extends Screen {
             dynamic.add(addRenderableWidget(Button.builder(Component.literal("All: " + m.title),
                     b -> Net.toServer(new ActionPacket(ActionPacket.ALL_HEROES_MODE, 0, m.name()))).bounds(x + i * (bw + 4), y, bw, 20).build()));
         }
-        y += 40;
-        for (int i = 0; i + 1 < fallen.length && y < top + h - 30; i += 2) {
+        int nFallen = Math.min(fallen.length / 2, 3);
+        y = top + h - 6 - nFallen * 20;
+        for (int i = 0; i + 1 < fallen.length && i / 2 < nFallen; i += 2) {
             HeroKind k = HeroKind.values()[fallen[i]];
             int idx = i / 2;
             int cost = k.cost / 2;
@@ -194,7 +198,7 @@ public class CoreScreen extends Screen {
     }
 
     private void renderCommand(GuiGraphics g) {
-        int x = left + 92, y = top + 82;
+        int x = left + 92, y = top + 104;
         g.drawString(font, "Your heroes on the field:", x, y, 0x7CFF9B, false);
         y += 12;
         Minecraft mc = Minecraft.getInstance();
@@ -203,14 +207,15 @@ public class CoreScreen extends Screen {
                 hh -> mc.player.getUUID().equals(hh.getOwnerId()));
         if (heroes.isEmpty()) g.drawString(font, "  none - buy hero sigils in the Heroes tab", x, y, 0x808080, false);
         int count = 0;
+        int maxRows = Math.max(1, (top + h - 24 - Math.min(fallen.length / 2, 3) * 20 - y) / 10);
         for (HeroEntity he : heroes) {
-            if (count++ > 6) break;
+            if (count++ >= maxRows) break;
             String s = "  " + he.kind.title + "  Lv" + he.heroLevel() + "  " + (int) he.getHealth() + "/" + (int) he.getMaxHealth() + "  [" + he.mode().title + "]";
             g.drawString(font, font.plainSubstrByWidth(s, w - 100), x, y, 0xD0D0D0, false);
             y += 10;
         }
-        int ry = top + h - 14 - Math.max(0, fallen.length / 2) * 20;
-        if (fallen.length > 0) g.drawString(font, "Fallen heroes (revive for half price):", x, ry - 12, 0xFF8080, false);
+        int ry = top + h - 6 - Math.min(fallen.length / 2, 3) * 20;
+        if (fallen.length > 0) g.drawString(font, "Fallen heroes (revive for half price):", x, ry - 11, 0xFF8080, false);
     }
 
     @Override

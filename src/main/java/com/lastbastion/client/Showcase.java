@@ -85,7 +85,8 @@ public final class Showcase {
         int n = 1;
         double y = GROUND;
         SHOTS.add(new Shot(String.format("%02d_vfx", n++), new Vec3(12, y + 6, VFX_Z - 15), 0, 16));
-        SHOTS.add(new Shot(String.format("%02d_core", n++), new Vec3(-10, y + 2.4, -5.2), 0, 14));
+        SHOTS.add(new Shot(String.format("%02d_core", n++), new Vec3(-10, y + 2.6, -7.2), 0, 8));
+        SHOTS.add(new Shot(String.format("%02d_core_close", n++), new Vec3(-10, y + 2.2, -3.4), 0, 4));
         ZombieKind[] zk = ZombieKind.values();
         for (int i = 0; i < zk.length; i++) {
             EntityDimensions d = zk[i].type().get().getDimensions();
@@ -108,6 +109,13 @@ public final class Showcase {
         for (int i = 0; i < bk.length; i++) {
             EntityDimensions d = bk[i].type().get().getDimensions();
             double dist = Math.max(6, d.height * 1.7 + d.width);
+            if (bk[i] == BossKind.MORVATHRAX || bk[i] == BossKind.PLAGUE_MOTHER) {
+                // three-quarter view from above so the body, legs and wings read
+                double dd = bk[i] == BossKind.MORVATHRAX ? 13 : 8;
+                SHOTS.add(new Shot(String.format("%02d_boss_%s", n++, bk[i].name().toLowerCase()),
+                        new Vec3(bossX(i) + dd * 0.72, y + d.height + (bk[i] == BossKind.MORVATHRAX ? 5 : 2.5), BOSS_Z - dd * 0.72), 45, 24));
+                continue;
+            }
             SHOTS.add(new Shot(String.format("%02d_boss_%s", n++, bk[i].name().toLowerCase()), new Vec3(bossX(i), y + d.height * 0.6 + 0.5, BOSS_Z - dist), 0, 10));
         }
     }
@@ -253,6 +261,12 @@ public final class Showcase {
         BlockPos core = new BlockPos(-10, GROUND, 0);
         level.setBlock(core, ModBlocks.SIEGE_CORE.get().defaultBlockState(), 3);
         SiegeManager.tryPlaceCore(level, core, null);
+        // fully upgraded and battered, so the photo shows every attachment, the cracks and the barrier
+        var cd = SiegeManager.data(level);
+        for (com.lastbastion.siege.CoreUpgrade u : com.lastbastion.siege.CoreUpgrade.values()) cd.upgrades[u.ordinal()] = u.maxLevel;
+        cd.coreHp = cd.maxHp() * 0.5f;
+        cd.shield = cd.maxShield();
+        SiegeManager.syncHud(level, cd);
     }
 
     /** A row of long-lived test effects so the VFX renderer can be checked in one picture. */

@@ -19,7 +19,7 @@ import net.minecraft.world.phys.Vec3;
 
 /** Projectiles, the drop pod, the Titan Exosuit, the sentry drone and the Siege Core crystal. */
 public final class MiscModels {
-    private static ModelSpec.Baked projectiles, pod, exo, drone, core;
+    private static ModelSpec.Baked projectiles, pod, exo, drone;
 
     private MiscModels() {
     }
@@ -227,25 +227,5 @@ public final class MiscModels {
             m.p("body").y += Mth.sin(age * 0.15f) * 0.6f;
             m.p("body").zRot = Mth.sin(age * 0.07f) * 0.08f;
         }, 0.2f);
-    }
-
-    // ------------------------------------------------------------------ Siege Core crystal (block entity)
-
-    public static ModelSpec.Baked core() {
-        if (core != null) return core;
-        ModelSpec s = new ModelSpec("siege_core");
-        Part c = s.root.child("crystal", 0, 0, 0);
-        c.child("gem", 0, 0, 0).rot(45, 0, 45).box(-4, -4, -4, 8, 8, 8, Paint.glowing(0x6FE3FF).pattern(Pattern.CRACKS, 0xE0FFFF));
-        c.child("inner", 0, 0, 0).rot(0, 45, 0).box(-2, -6, -2, 4, 12, 4, Paint.glowing(0xFFFFFF).pattern(Pattern.GRADIENT, 0x6FE3FF));
-        Paint ring = Paint.of(0xD8B040).pattern(Pattern.RUNES, 0x6FE3FF);
-        Part r1 = s.root.child("ring1", 0, 0, 0);
-        r1.box(-9, -0.5f, -9, 18, 1, 1, ring).box(-9, -0.5f, 8, 18, 1, 1, ring).box(-9, -0.5f, -8, 1, 1, 16, ring).box(8, -0.5f, -8, 1, 1, 16, ring);
-        Part r2 = s.root.child("ring2", 0, 0, 0);
-        r2.box(-7, -7, -0.5f, 14, 1, 1, ring).box(-7, 6, -0.5f, 14, 1, 1, ring).box(-7, -6, -0.5f, 1, 12, 1, ring).box(6, -6, -0.5f, 1, 12, 1, ring);
-        Part shield = s.root.child("barrier", 0, 0, 0);
-        Paint glass = Paint.glowing(0x3A9ACF).pattern(Pattern.SCALES, 0x6FE3FF);
-        shield.box(-12, -12, -12, 24, 24, 24, glass);
-        core = s.bake();
-        return core;
     }
 }
