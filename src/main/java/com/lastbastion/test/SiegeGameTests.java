@@ -219,4 +219,79 @@ public final class SiegeGameTests {
         if (fails.length() == 0) h.succeed();
         else h.fail(fails.toString());
     }
+
+    /** A fake player with the item in hand and its attribute modifiers applied (fake players never tick). */
+    private static net.minecraft.server.level.ServerPlayer armedPlayer(ServerLevel level, String name, Vec3 at, net.minecraft.world.item.ItemStack held) {
+        net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), name));
+        p.moveTo(at.x, at.y, at.z, 0, 0);
+        p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, held);
+        p.getAttributes().addTransientAttributeModifiers(held.getAttributeModifiers(net.minecraft.world.entity.EquipmentSlot.MAINHAND));
+        return p;
+    }
+
+    private static void face(net.minecraft.server.level.ServerPlayer p, Vec3 target) {
+        Vec3 d = target.subtract(p.position());
+        float yaw = (float) (Math.atan2(d.z, d.x) * 180.0 / Math.PI) - 90f;
+        p.setYRot(yaw);
+        p.setYHeadRot(yaw);
+        p.setXRot(0);
+    }
+
+    /** Every melee weapon lands its full combo on a zombie in front of it and fires its special without errors. */
+    @GameTest(template = "arena", timeoutTicks = 240, batch = "siege_melee")
+    public static void meleeArsenal(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        StringBuilder fails = new StringBuilder();
+        com.lastbastion.item.weapon.WeaponKind[] kinds = com.lastbastion.item.weapon.WeaponKind.values();
+        for (int i = 0; i < kinds.length; i++) {
+            com.lastbastion.item.weapon.WeaponKind k = kinds[i];
+            Vec3 at = ring(core, 7, i, kinds.length);
+            net.minecraft.world.item.ItemStack w = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.MELEE.get(k).get());
+            com.lastbastion.item.weapon.Arsenal.setMk(w, 5);
+            net.minecraft.server.level.ServerPlayer p = armedPlayer(level, "melee_" + i, at, w);
+            Vec3 zp = at.add(new Vec3(core.getX() + 0.5 - at.x, 0, core.getZ() + 0.5 - at.z).normalize().scale(1.6));
+            SiegeZombie z = ZombieSpawner.spawn(level, ZombieKind.SHAMBLER, ZombieRank.ROTTEN, 0, zp, false, false, 1f, 1f);
+            if (z == null) {
+                fails.append(k.id).append(": no zombie; ");
+                continue;
+            }
+            z.setNoAi(true);
+            face(p, z.position());
+            float hp = z.getHealth();
+            for (int s = 0; s < k.combo.length; s++) com.lastbastion.item.weapon.MeleeCombat.swing(level, p, true);
+            if (z.isAlive() && z.getHealth() >= hp) fails.append(k.id).append(" never hit; ");
+            com.lastbastion.item.weapon.MeleeWeaponItem.setFury(w, 100, level.getGameTime());
+            com.lastbastion.item.weapon.MeleeWeaponItem.setSouls(w, 10);
+            if (k == com.lastbastion.item.weapon.WeaponKind.DAWNBREAKER) com.lastbastion.item.weapon.MeleeCombat.releaseCharge(level, p, w, k, 30);
+            else com.lastbastion.item.weapon.MeleeCombat.special(level, p, w, k);
+        }
+        h.runAfterDelay(200, () -> {
+            teardown(h, core);
+            if (fails.length() == 0) h.succeed();
+            else h.fail(fails.toString());
+        });
+    }
+
+    /** Buying a weapon upgrade raises the held weapon's Mk and charges the right price. */
+    @GameTest(template = "arena", timeoutTicks = 60, batch = "siege_arsenal_shop")
+    public static void weaponUpgradePurchase(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        net.minecraft.world.item.ItemStack w = new net.minecraft.world.item.ItemStack(
+                com.lastbastion.registry.ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.MILITIA_LONGSWORD).get());
+        net.minecraft.server.level.ServerPlayer p = armedPlayer(level, "smith_tester", new Vec3(core.getX() + 2.5, core.getY(), core.getZ() + 0.5), w);
+        SiegeData d = SiegeManager.data(level);
+        d.credits.put(p.getUUID(), 5000);
+        int price = com.lastbastion.item.weapon.Arsenal.upgradeCost(p.getMainHandItem());
+        com.lastbastion.siege.ShopCatalog.purchase(p, com.lastbastion.siege.ShopCatalog.UPGRADE_WEAPON, 0);
+        int mk = com.lastbastion.item.weapon.Arsenal.mk(p.getMainHandItem());
+        int left = d.credits(p.getUUID());
+        com.lastbastion.siege.ShopCatalog.purchase(p, "melee_frostfang", 0);
+        boolean bought = p.getInventory().countItem(com.lastbastion.registry.ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.FROSTFANG).get()) == 1;
+        teardown(h, core);
+        if (mk == 2 && price > 0 && left == 5000 - price && bought) h.succeed();
+        else h.fail("upgrade mismatch: mk=" + mk + " price=" + price + " credits=" + left + " frostfang=" + bought);
+    }
 }

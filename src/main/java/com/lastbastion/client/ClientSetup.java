@@ -61,6 +61,14 @@ public final class ClientSetup {
         e.registerSpriteSet(com.lastbastion.registry.ModParticles.FX.get(), com.lastbastion.client.fx.FxParticle.Provider::new);
     }
 
+    /** Inventory sprites for the 3D weapons (drawn by the weapon renderer in GUI slots). */
+    @SubscribeEvent
+    public static void extraModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional e) {
+        for (com.lastbastion.item.weapon.WeaponKind k : com.lastbastion.item.weapon.WeaponKind.values()) {
+            e.register(com.lastbastion.client.render.weapon.WeaponRenderer.iconModel(k));
+        }
+    }
+
     @SubscribeEvent
     public static void keys(RegisterKeyMappingsEvent e) {
         e.register(HERO_COMMAND);

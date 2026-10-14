@@ -6,6 +6,8 @@ import com.lastbastion.item.ConsumableItem;
 import com.lastbastion.item.GrenadeItem;
 import com.lastbastion.item.GunItem;
 import com.lastbastion.item.SupportCallItem;
+import com.lastbastion.item.weapon.Arsenal;
+import com.lastbastion.item.weapon.WeaponKind;
 import com.lastbastion.registry.ModBlocks;
 import com.lastbastion.registry.ModItems;
 import net.minecraft.ChatFormatting;
@@ -55,8 +57,15 @@ public final class ShopCatalog {
             this.lines = List.of(lines);
         }
 
-        /** Current cost (core upgrades scale with level; repairs scale with wave). -1 = sold out. */
-        public int cost(int[] upgrades, int wave) {
+        /**
+         * Current cost (core upgrades scale with level; repairs scale with wave; weapon upgrades depend on
+         * the weapon in hand). -1 = sold out / maxed, -2 = not applicable right now.
+         */
+        public int cost(int[] upgrades, int wave, ItemStack held) {
+            if (id.equals(UPGRADE_WEAPON)) {
+                if (held == null || !(held.getItem() instanceof Arsenal.Upgradeable)) return -2;
+                return Arsenal.upgradeCost(held);
+            }
             if (upgrade != null) {
                 int lvl = upgrades[upgrade.ordinal()];
                 return lvl >= upgrade.maxLevel ? -1 : upgrade.costs[lvl];
@@ -66,6 +75,7 @@ public final class ShopCatalog {
         }
     }
 
+    public static final String UPGRADE_WEAPON = "upgrade_weapon";
     private static List<Entry> entries;
     private static Map<String, Entry> byId;
 
@@ -97,13 +107,21 @@ public final class ShopCatalog {
             l.add(new Entry("hero_" + k.id, Category.HEROES, k.title, k.cost, stack(ModItems.HERO_SIGILS.get(k), 1), stack(ModItems.HERO_SIGILS.get(k), 1), null,
                     k.desc, "HP " + (int) k.hp + "   Damage " + (int) k.damage + "   Role: " + k.role.name().charAt(0) + k.role.name().substring(1).toLowerCase(), k.moves));
         }
-        int[] gunCosts = {600, 450, 900, 1400, 700, 800, 750, 650};
+        l.add(new Entry(UPGRADE_WEAPON, Category.ARSENAL, "Upgrade Held Weapon", 0, () -> new ItemStack(net.minecraft.world.item.Items.SMITHING_TABLE), null, null,
+                "Raises the arsenal weapon in your main hand by one Mk (up to Mk V).",
+                "Each Mk: more damage. Mk III awakens a second passive; Mk V ascends the special ability.",
+                "Cost: 40% / 70% / 110% / 160% of the weapon's price for Mk II / III / IV / V."));
+        for (WeaponKind k : WeaponKind.values()) {
+            l.add(new Entry("melee_" + k.id, Category.ARSENAL, k.title, k.cost, stack(ModItems.MELEE.get(k), 1), stack(ModItems.MELEE.get(k), 1), null,
+                    String.format("%.0f damage, %.1f attacks/s, reach %.1f, cleaves %d.", k.damage, k.attacksPerSecond, k.reach, k.cleave),
+                    "Special - " + k.special + ": " + k.specialDesc,
+                    "Passive - " + k.passive + ": " + k.passiveDesc,
+                    "Mk III - " + k.awakened + ": " + k.awakenedDesc));
+        }
         for (GunItem.GunKind g : GunItem.GunKind.values()) {
-            l.add(new Entry("gun_" + g.name().toLowerCase(Locale.ROOT), Category.ARSENAL, g.title, gunCosts[g.ordinal()],
+            l.add(new Entry("gun_" + g.name().toLowerCase(Locale.ROOT), Category.ARSENAL, g.title, g.cost,
                     stack(ModItems.GUNS.get(g), 1), stack(ModItems.GUNS.get(g), 1), null, g.desc, "Damage " + g.damage));
         }
-        l.add(new Entry("voidedge", Category.ARSENAL, "'Voidedge' Plasma Katana", 1000, stack(ModItems.VOIDEDGE, 1), stack(ModItems.VOIDEDGE, 1), null,
-                "13 melee damage. Right-click: Phase Dash through an 8-block line."));
         l.add(new Entry("vanguard_armor", Category.ARSENAL, "Vanguard Armor Set", 900, () -> new ItemStack(Items.DIAMOND_CHESTPLATE), ShopCatalog::vanguardBundle, null,
                 "Full diamond armor with Protection III. Delivered as a bundle of 4 pieces."));
         l.add(new Entry("bastion_shield", Category.ARSENAL, "Bastion Tower Shield", 120, () -> new ItemStack(Items.SHIELD), () -> {
@@ -194,7 +212,9 @@ public final class ShopCatalog {
         if (id.equals("revive")) return revive(player, d, arg);
         Entry e = get(id);
         if (e == null) return Component.literal("Unknown item.").withStyle(ChatFormatting.RED);
-        int cost = e.cost(d.upgrades, d.wave);
+        ItemStack held = player.getMainHandItem();
+        int cost = e.cost(d.upgrades, d.wave, held);
+        if (cost == -2) return Component.literal("Hold an arsenal weapon in your main hand to upgrade it.").withStyle(ChatFormatting.YELLOW);
         if (cost < 0) return Component.literal("Already at maximum level.").withStyle(ChatFormatting.YELLOW);
         if (!SiegeManager.spend(level, player, cost)) {
             return Component.literal("Not enough credits (" + cost + " needed).").withStyle(ChatFormatting.RED);
@@ -207,6 +227,17 @@ public final class ShopCatalog {
             SiegeManager.syncHud(level, d);
             com.lastbastion.combat.Fx.skyBeam(level, net.minecraft.world.phys.Vec3.atCenterOf(SiegeManager.corePos(level)), 0xC86BFF, 30, 1.2);
             return Component.literal(e.upgrade.title + " upgraded to level " + d.upgrades[e.upgrade.ordinal()] + "!").withStyle(ChatFormatting.LIGHT_PURPLE);
+        }
+        if (id.equals(UPGRADE_WEAPON)) {
+            int mk = Arsenal.mk(held) + 1;
+            Arsenal.setMk(held, mk);
+            String title = held.getItem() instanceof Arsenal.Upgradeable u ? u.displayTitle() : "Weapon";
+            level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.ANVIL_USE, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.2f);
+            level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.4f);
+            com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.STAR, player.position().add(0, 1.2, 0), 0xFFFFFF, 0xFFD966, 0.25f, 20, 0.25f, 0.8f);
+            com.lastbastion.fx.Vfx.ring(level, player.position().add(0, 0.1, 0), 0xFFD966, 2.5f, 14, 0.8f);
+            String extra = mk == 3 ? " Awakened!" : mk == Arsenal.MAX_MK ? " Ascended!" : "";
+            return Component.literal(title + " upgraded to Mk " + Arsenal.roman(mk) + "." + extra).withStyle(Arsenal.mkColor(mk));
         }
         if (id.equals("core_repair_now")) {
             SiegeManager.healCore(level, d.maxHp() * 0.25f);

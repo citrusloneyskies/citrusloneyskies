@@ -164,10 +164,10 @@ public class CoreScreen extends Screen {
                 boolean hover = mx >= lx && mx < lx + lw && my >= y && my < y + ROW && my >= ly && my < ly + lh;
                 g.fill(lx, y, lx + lw, y + ROW - 1, sel ? 0xFF283848 : hover ? 0xFF1E262E : 0xFF14181C);
                 g.renderItem(e.icon.get(), lx + 3, y + 3);
-                int cost = e.cost(up, ClientSiegeState.wave());
+                int cost = e.cost(up, ClientSiegeState.wave(), held());
                 String name = font.plainSubstrByWidth(e.name, lw - 26);
                 g.drawString(font, name, lx + 22, y + 2, 0xFFFFFF, false);
-                String c = cost < 0 ? "MAX" : String.format("%,d", cost);
+                String c = cost == -2 ? "\u2014" : cost < 0 ? "MAX" : String.format("%,d", cost);
                 g.drawString(font, c, lx + 22, y + 12, cost < 0 ? 0x7CFF9B : ClientSiegeState.credits() >= cost ? 0xFFD966 : 0xFF6060, false);
                 if (e.upgrade != null) {
                     String lvl = "Lv " + up[e.upgrade.ordinal()] + "/" + e.upgrade.maxLevel;
@@ -192,9 +192,9 @@ public class CoreScreen extends Screen {
             }
             cy += 3;
         }
-        int cost = selected.cost(up, ClientSiegeState.wave());
+        int cost = selected.cost(up, ClientSiegeState.wave(), held());
         buyButton.active = cost >= 0 && ClientSiegeState.credits() >= cost;
-        buyButton.setMessage(Component.literal(cost < 0 ? "Maxed" : "Buy (" + String.format("%,d", cost) + ")"));
+        buyButton.setMessage(Component.literal(cost == -2 ? "Hold a weapon" : cost < 0 ? "Maxed" : "Buy (" + String.format("%,d", cost) + ")"));
     }
 
     private void renderCommand(GuiGraphics g) {
@@ -254,6 +254,11 @@ public class CoreScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private static ItemStack held() {
+        var p = Minecraft.getInstance().player;
+        return p == null ? ItemStack.EMPTY : p.getMainHandItem();
     }
 
     /** Keeps icons valid even before items finish registering in odd load orders. */

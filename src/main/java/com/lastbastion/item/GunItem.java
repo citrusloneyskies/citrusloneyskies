@@ -35,30 +35,47 @@ import java.util.Set;
  * Core-shop firearms. Automatic weapons fire while right-click is held (with heat management);
  * semi-automatic weapons fire per click with a cooldown; the railgun charges and fires on release.
  */
-public class GunItem extends Item {
+public class GunItem extends Item implements com.lastbastion.item.weapon.Arsenal.Upgradeable {
     public enum GunKind {
-        RAVAGER("M60 'Ravager' Machine Gun", true, 2, 4.5f, "Hold to fire. 30 rounds/sec of pain. Overheats - let it cool."),
-        THUNDERBOOM("'Thunderboom' Scattergun", false, 16, 3.2f, "8 pellets per blast with heavy knockback."),
-        HELLFIRE("'Hellfire' Rocket Launcher", false, 40, 30f, "High-explosive rockets with a 4-block blast."),
-        STARPIERCER("'Starpiercer' Railgun", false, 60, 90f, "Hold to charge (1s), release to fire a beam that pierces every enemy in a line."),
-        DRAGONBREATH("'Dragon's Breath' Flamethrower", true, 2, 2.2f, "Hold to spray a 7-block cone of fire."),
-        STORMFIST("'Stormfist' Tesla Gauntlet", false, 22, 12f, "Chain lightning that arcs through 5 enemies."),
-        GLACIER("'Glacier' Cryo Cannon", false, 45, 14f, "Frost orb that freezes everything in a 3.5-block burst."),
-        SUNLANCE("'Sunlance' Holy Repeater", false, 8, 7f, "Rapid holy bolts. Devastating against the undead.");
+        RAVAGER("M60 'Ravager' Machine Gun", true, 2, 4.5f, 600, "Hold to fire. 30 rounds/sec of pain. Overheats - let it cool."),
+        THUNDERBOOM("'Thunderboom' Scattergun", false, 16, 3.2f, 450, "8 pellets per blast with heavy knockback."),
+        HELLFIRE("'Hellfire' Rocket Launcher", false, 40, 30f, 900, "High-explosive rockets with a 4-block blast."),
+        STARPIERCER("'Starpiercer' Railgun", false, 60, 90f, 1400, "Hold to charge (1s), release to fire a beam that pierces every enemy in a line."),
+        DRAGONBREATH("'Dragon's Breath' Flamethrower", true, 2, 2.2f, 700, "Hold to spray a 7-block cone of fire."),
+        STORMFIST("'Stormfist' Tesla Gauntlet", false, 22, 12f, 800, "Chain lightning that arcs through 5 enemies."),
+        GLACIER("'Glacier' Cryo Cannon", false, 45, 14f, 750, "Frost orb that freezes everything in a 3.5-block burst."),
+        SUNLANCE("'Sunlance' Holy Repeater", false, 8, 7f, 650, "Rapid holy bolts. Devastating against the undead.");
 
         public final String title;
         public final boolean automatic;
         public final int cooldown;
         public final float damage;
+        public final int cost;
         public final String desc;
 
-        GunKind(String title, boolean automatic, int cooldown, float damage, String desc) {
+        GunKind(String title, boolean automatic, int cooldown, float damage, int cost, String desc) {
             this.title = title;
             this.automatic = automatic;
             this.cooldown = cooldown;
             this.damage = damage;
+            this.cost = cost;
             this.desc = desc;
         }
+    }
+
+    @Override
+    public int baseCost() {
+        return kind.cost;
+    }
+
+    @Override
+    public String displayTitle() {
+        return kind.title;
+    }
+
+    /** Damage per hit after the weapon's Mk upgrades. */
+    float dmg(ItemStack stack) {
+        return kind.damage * com.lastbastion.item.weapon.Arsenal.damageMult(stack);
     }
 
     public final GunKind kind;
@@ -118,7 +135,7 @@ public class GunItem extends Item {
                 sl.playSound(null, user.blockPosition(), SoundEvents.FIRE_EXTINGUISH, SoundSource.PLAYERS, 1f, 0.8f);
                 return;
             }
-            Hitscan.fire(sl, user, eye.add(0, -0.15, 0), Hitscan.spreadDir(user, look, 0.03), 48, kind.damage, Element.PHYSICAL, Fx.dust(0xFFD070, 0.5f));
+            Hitscan.fire(sl, user, eye.add(0, -0.15, 0), Hitscan.spreadDir(user, look, 0.03), 48, dmg(stack), Element.PHYSICAL, Fx.dust(0xFFD070, 0.5f));
             sl.playSound(null, user.blockPosition(), SoundEvents.CROSSBOW_SHOOT, SoundSource.PLAYERS, 0.5f, 1.8f + sl.random.nextFloat() * 0.2f);
             Vec3 m = muzzle(user);
             sl.sendParticles(ParticleTypes.SMOKE, m.x, m.y, m.z, 1, 0.02, 0.02, 0.02, 0.01);
@@ -127,7 +144,7 @@ public class GunItem extends Item {
             Fx.cone(sl, m, look, 7, 14, ParticleTypes.FLAME, 14);
             for (LivingEntity e : SiegeDamage.enemiesAround(sl, m.add(look.scale(3.5)), 4.5)) {
                 if (e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(m).normalize().dot(look) < 0.8) continue;
-                SiegeDamage.deal(e, user, user, kind.damage, Element.FIRE, false);
+                SiegeDamage.deal(e, user, user, dmg(stack), Element.FIRE, false);
                 e.setSecondsOnFire(4);
                 if (sl.random.nextInt(4) == 0) SiegeDamage.applyStacking(e, ModEffects.SCORCHED.get(), 60, 1);
             }
@@ -150,7 +167,7 @@ public class GunItem extends Item {
             if (along < 0 || rel.subtract(dir.scale(along)).lengthSqr() > 1.5) continue;
             hit.add(e);
         }
-        for (LivingEntity e : hit) SiegeDamage.deal(e, user, user, kind.damage, Element.ARCANE, true);
+        for (LivingEntity e : hit) SiegeDamage.deal(e, user, user, dmg(stack), Element.ARCANE, true);
         Fx.line(sl, from.add(dir), end, Fx.dust(0x7FE8FF, 1.6f), 0.25);
         Fx.line(sl, from.add(dir), end, ParticleTypes.END_ROD, 1.2);
         sl.playSound(null, user.blockPosition(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 1f, 1.6f);
@@ -165,7 +182,7 @@ public class GunItem extends Item {
         switch (kind) {
             case THUNDERBOOM -> {
                 for (int i = 0; i < 8; i++) {
-                    LivingEntity hit = Hitscan.fire(sl, p, eye, Hitscan.spreadDir(p, look, 0.09), 20, kind.damage, Element.PHYSICAL, Fx.dust(0xFFB060, 0.4f));
+                    LivingEntity hit = Hitscan.fire(sl, p, eye, Hitscan.spreadDir(p, look, 0.09), 20, dmg(stack), Element.PHYSICAL, Fx.dust(0xFFB060, 0.4f));
                     if (hit != null) SiegeDamage.push(hit, p.position(), 0.35, 0.1);
                 }
                 sound(sl, p, SoundEvents.GENERIC_EXPLODE, 0.7f, 1.6f);
@@ -173,13 +190,13 @@ public class GunItem extends Item {
                 p.push(-look.x * 0.3, 0.05, -look.z * 0.3);
             }
             case HELLFIRE -> {
-                SiegeProjectile r = SiegeProjectile.create(sl, ProjKind.ROCKET, p, m).payload(kind.damage, Element.EXPLOSIVE).area(4f);
+                SiegeProjectile r = SiegeProjectile.create(sl, ProjKind.ROCKET, p, m).payload(dmg(stack), Element.EXPLOSIVE).area(4f);
                 r.knockback = 0.8f;
                 r.aim(eye.add(look.scale(50)), 1.6f).scale(1.3f).fire(sl);
                 sound(sl, p, SoundEvents.FIREWORK_ROCKET_LAUNCH, 1.2f, 0.6f);
             }
             case STORMFIST -> {
-                LivingEntity first = Hitscan.fire(sl, p, eye, look, 24, kind.damage, Element.LIGHTNING, Fx.dust(0xF4F06A, 0.6f));
+                LivingEntity first = Hitscan.fire(sl, p, eye, look, 24, dmg(stack), Element.LIGHTNING, Fx.dust(0xF4F06A, 0.6f));
                 if (first != null) {
                     Set<LivingEntity> hit = new HashSet<>();
                     hit.add(first);
@@ -191,7 +208,7 @@ public class GunItem extends Item {
                                 .min(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(c))).orElse(null);
                         if (next == null) break;
                         Fx.bolt(sl, cur.position().add(0, cur.getBbHeight() * 0.5, 0), next.position().add(0, next.getBbHeight() * 0.5, 0), 0xF4F06A, 1f);
-                        SiegeDamage.deal(next, p, p, kind.damage * 0.8f, Element.LIGHTNING, false);
+                        SiegeDamage.deal(next, p, p, dmg(stack) * 0.8f, Element.LIGHTNING, false);
                         SiegeDamage.apply(next, ModEffects.SHOCKED.get(), 15, 0);
                         hit.add(next);
                         cur = next;
@@ -201,13 +218,13 @@ public class GunItem extends Item {
                 sound(sl, p, SoundEvents.LIGHTNING_BOLT_IMPACT, 0.8f, 1.6f);
             }
             case GLACIER -> {
-                SiegeProjectile f = SiegeProjectile.create(sl, ProjKind.FROST_SHARD, p, m).payload(kind.damage, Element.ICE).area(3.5f);
+                SiegeProjectile f = SiegeProjectile.create(sl, ProjKind.FROST_SHARD, p, m).payload(dmg(stack), Element.ICE).area(3.5f);
                 f.onEntityHit = (pr, e) -> SiegeDamage.apply(e, ModEffects.FROZEN.get(), 60, 0);
                 f.aim(eye.add(look.scale(40)), 1.4f).scale(2.2f).fire(sl);
                 sound(sl, p, SoundEvents.SNOW_GOLEM_SHOOT, 1.2f, 0.5f);
             }
             case SUNLANCE -> {
-                SiegeProjectile h = SiegeProjectile.create(sl, ProjKind.HOLY_BOLT, p, m).payload(kind.damage, Element.HOLY)
+                SiegeProjectile h = SiegeProjectile.create(sl, ProjKind.HOLY_BOLT, p, m).payload(dmg(stack), Element.HOLY)
                         .status(ModEffects.PURIFIED, 60, 0);
                 h.aim(eye.add(look.scale(40)), 2.2f).fire(sl);
                 sound(sl, p, SoundEvents.AMETHYST_BLOCK_CHIME, 1f, 1.6f);
@@ -263,6 +280,6 @@ public class GunItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
         tip.add(Component.literal(kind.desc).withStyle(ChatFormatting.GRAY));
-        tip.add(Component.literal("Damage: " + kind.damage).withStyle(ChatFormatting.DARK_AQUA));
+        tip.add(Component.literal("Damage: " + dmg(stack)).withStyle(ChatFormatting.DARK_AQUA));
     }
 }

@@ -9,7 +9,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class Net {
-    private static final String PROTOCOL = "3";
+    private static final String PROTOCOL = "4";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(new ResourceLocation(LastBastion.MODID, "main"),
             () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
 
@@ -32,6 +32,10 @@ public final class Net {
                 .encoder(VfxPacket::encode).decoder(VfxPacket::new).consumerMainThread(VfxPacket::handle).add();
         CHANNEL.messageBuilder(SpeechPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SpeechPacket::encode).decoder(SpeechPacket::new).consumerMainThread(SpeechPacket::handle).add();
+        CHANNEL.messageBuilder(WeaponSwingPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(WeaponSwingPacket::encode).decoder(WeaponSwingPacket::new).consumerMainThread(WeaponSwingPacket::handle).add();
+        CHANNEL.messageBuilder(WeaponAnimPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(WeaponAnimPacket::encode).decoder(WeaponAnimPacket::new).consumerMainThread(WeaponAnimPacket::handle).add();
     }
 
     public static void sendTo(ServerPlayer player, Object msg) {

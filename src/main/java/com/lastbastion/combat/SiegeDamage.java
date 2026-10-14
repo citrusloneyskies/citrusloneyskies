@@ -88,6 +88,12 @@ public final class SiegeDamage {
      */
     public static boolean deal(LivingEntity target, @Nullable Entity direct, @Nullable Entity owner, float amount,
                                Element element, boolean knockback) {
+        return deal(target, direct, owner, amount, element, knockback, false);
+    }
+
+    /** As {@link #deal(LivingEntity, Entity, Entity, float, Element, boolean)}; {@code pierceArmor} ignores the target's armor. */
+    public static boolean deal(LivingEntity target, @Nullable Entity direct, @Nullable Entity owner, float amount,
+                               Element element, boolean knockback, boolean pierceArmor) {
         if (target.level().isClientSide || amount <= 0) return false;
         Entity responsible = owner != null ? owner : direct;
         if (!canHit(responsible, target)) return false;
@@ -111,7 +117,9 @@ public final class SiegeDamage {
             if (responsible != null) target.getPersistentData().putUUID(TAG_KILLER, responsible.getUUID());
         }
         target.getPersistentData().putString(TAG_ELEMENT, element.name());
-        DamageSource source = source(target, direct, responsible, element);
+        DamageSource source = pierceArmor && responsible != null
+                ? target.damageSources().indirectMagic(direct != null ? direct : responsible, responsible)
+                : source(target, direct, responsible, element);
         Vec3 motion = target.getDeltaMovement();
         target.invulnerableTime = 0;
         boolean hit = target.hurt(source, dmg);

@@ -4,6 +4,8 @@ import com.lastbastion.LastBastion;
 import com.lastbastion.entity.hero.HeroKind;
 import com.lastbastion.entity.turret.TurretKind;
 import com.lastbastion.item.*;
+import com.lastbastion.item.weapon.MeleeWeaponItem;
+import com.lastbastion.item.weapon.WeaponKind;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
@@ -26,7 +28,8 @@ public final class ModItems {
     public static final Map<GrenadeItem.Kind, RegistryObject<Item>> GRENADES = new EnumMap<>(GrenadeItem.Kind.class);
     public static final Map<ConsumableItem.Kind, RegistryObject<Item>> CONSUMABLES = new EnumMap<>(ConsumableItem.Kind.class);
     public static final Map<SupportCallItem.Kind, RegistryObject<Item>> SUPPORT = new EnumMap<>(SupportCallItem.Kind.class);
-    public static final RegistryObject<Item> VOIDEDGE = ITEMS.register("voidedge", () -> new VoidedgeItem(new Item.Properties()));
+    /** The melee arsenal (the Voidedge keeps its original registry name). */
+    public static final Map<WeaponKind, RegistryObject<Item>> MELEE = new EnumMap<>(WeaponKind.class);
 
     static {
         for (TurretKind k : TurretKind.values()) {
@@ -34,6 +37,9 @@ public final class ModItems {
         }
         for (HeroKind k : HeroKind.values()) {
             HERO_SIGILS.put(k, ITEMS.register("sigil_" + k.id, () -> new HeroSigilItem(new Item.Properties().stacksTo(1), k)));
+        }
+        for (WeaponKind k : WeaponKind.values()) {
+            MELEE.put(k, ITEMS.register(k.id, () -> new MeleeWeaponItem(new Item.Properties(), k)));
         }
         for (GunItem.GunKind k : GunItem.GunKind.values()) {
             GUNS.put(k, ITEMS.register("gun_" + k.name().toLowerCase(Locale.ROOT), () -> new GunItem(new Item.Properties(), k)));
