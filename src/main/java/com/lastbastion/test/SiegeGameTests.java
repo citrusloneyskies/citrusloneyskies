@@ -294,4 +294,60 @@ public final class SiegeGameTests {
         if (mk == 2 && price > 0 && left == 5000 - price && bought) h.succeed();
         else h.fail("upgrade mismatch: mk=" + mk + " price=" + price + " credits=" + left + " frostfang=" + bought);
     }
+
+    /** Every gun's primary and alternate fire damage a zombie in front of it; magazines empty and reload. */
+    @GameTest(template = "arena", timeoutTicks = 200, batch = "siege_guns")
+    public static void gunArsenal(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        StringBuilder fails = new StringBuilder();
+        com.lastbastion.item.GunItem.GunKind[] kinds = com.lastbastion.item.GunItem.GunKind.values();
+        java.util.Map<SiegeZombie, Float> targets = new java.util.HashMap<>();
+        java.util.Map<SiegeZombie, String> names = new java.util.HashMap<>();
+        for (int i = 0; i < kinds.length; i++) {
+            com.lastbastion.item.GunItem.GunKind k = kinds[i];
+            Vec3 at = ring(core, 9, i, kinds.length);
+            net.minecraft.world.item.ItemStack gun = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.GUNS.get(k).get());
+            net.minecraft.server.level.ServerPlayer p = armedPlayer(level, "gunner_" + i, at, gun);
+            Vec3 out = new Vec3(at.x - core.getX() - 0.5, 0, at.z - core.getZ() - 0.5).normalize();
+            SiegeZombie z = ZombieSpawner.spawn(level, ZombieKind.BRUTE, ZombieRank.ROTTEN, 0, at.add(out.scale(4)), false, false, 4f, 1f);
+            if (z == null) {
+                fails.append(k.name()).append(": no zombie; ");
+                continue;
+            }
+            z.setNoAi(true);
+            face(p, z.position());
+            targets.put(z, z.getHealth());
+            names.put(z, k.name());
+            com.lastbastion.item.GunItem g = (com.lastbastion.item.GunItem) gun.getItem();
+            if (k.automatic) {
+                for (int t = 0; t < 8; t++) g.onUseTick(level, p, gun, g.getUseDuration(gun) - t * k.cooldown);
+            } else if (k == com.lastbastion.item.GunItem.GunKind.STARPIERCER) {
+                g.releaseUsing(gun, level, p, g.getUseDuration(gun) - 25);
+            } else {
+                int before = g.ammo(gun);
+                g.use(level, p, net.minecraft.world.InteractionHand.MAIN_HAND);
+                if (g.ammo(gun) != before - 1 && !(k.mag == 1 && com.lastbastion.item.GunItem.reloading(gun))) {
+                    fails.append(k.name()).append(" did not use ammo; ");
+                }
+            }
+            p.setShiftKeyDown(true);
+            p.getCooldowns().removeCooldown(g);
+            if (!k.automatic && k != com.lastbastion.item.GunItem.GunKind.STARPIERCER) {
+                gun.getOrCreateTag().remove(com.lastbastion.item.GunItem.TAG_RELOAD);
+                gun.getOrCreateTag().putInt(com.lastbastion.item.GunItem.TAG_AMMO, g.magSize(gun));
+            }
+            g.use(level, p, net.minecraft.world.InteractionHand.MAIN_HAND);
+            p.setShiftKeyDown(false);
+        }
+        h.runAfterDelay(150, () -> {
+            for (java.util.Map.Entry<SiegeZombie, Float> e : targets.entrySet()) {
+                SiegeZombie z = e.getKey();
+                if (z.isAlive() && z.getHealth() >= e.getValue()) fails.append(names.get(z)).append(" never hit; ");
+            }
+            teardown(h, core);
+            if (fails.length() == 0) h.succeed();
+            else h.fail(fails.toString());
+        });
+    }
 }

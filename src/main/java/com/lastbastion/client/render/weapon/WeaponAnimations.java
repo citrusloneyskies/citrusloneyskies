@@ -47,6 +47,8 @@ public final class WeaponAnimations {
     private static int lastSent = -100;
     private static int localStep = -1;
     private static long localLast = -1000;
+    private static net.minecraft.world.item.Item lastItem;
+    private static int lastChange = -100;
 
     private WeaponAnimations() {
     }
@@ -123,9 +125,22 @@ public final class WeaponAnimations {
 
     // ------------------------------------------------------------------ first person
 
+    /**
+     * Vanilla drops the held item after every right-click use (the re-equip dip); arsenal weapons only
+     * play the equip animation after an actual switch of the main-hand item.
+     */
+    public static float equip(LocalPlayer player, ItemStack stack, float equip) {
+        if (player.getMainHandItem() != stack) return equip;
+        if (stack.getItem() != lastItem) {
+            lastItem = stack.getItem();
+            lastChange = ticks;
+        }
+        return ticks - lastChange < 12 ? equip : 0f;
+    }
+
     public static void firstPerson(PoseStack pose, LocalPlayer player, HumanoidArm arm, ItemStack stack, WeaponKind k, float equip) {
         boolean left = arm == HumanoidArm.LEFT;
-        pose.translate((left ? -1 : 1) * 0.56F, -0.52F + equip * -0.6F, -0.72F);
+        pose.translate((left ? -1 : 1) * 0.56F, -0.52F + equip(player, stack, equip) * -0.6F, -0.72F);
         PoseXf xf = new PoseXf(pose);
         if (player.getMainHandItem() == stack) {
             if (player.isUsingItem() && player.getUseItem() == stack) {

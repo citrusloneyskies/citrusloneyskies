@@ -30,6 +30,8 @@ public final class ClientSetup {
             GLFW.GLFW_KEY_G, "key.categories.lastbastion");
     public static final KeyMapping PROTOCOLS = new KeyMapping("key.lastbastion.protocols", InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_V, "key.categories.lastbastion");
+    public static final KeyMapping RELOAD = new KeyMapping("key.lastbastion.reload", InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_R, "key.categories.lastbastion");
 
     private ClientSetup() {
     }
@@ -67,11 +69,15 @@ public final class ClientSetup {
         for (com.lastbastion.item.weapon.WeaponKind k : com.lastbastion.item.weapon.WeaponKind.values()) {
             e.register(com.lastbastion.client.render.weapon.WeaponRenderer.iconModel(k));
         }
+        for (com.lastbastion.item.GunItem.GunKind k : com.lastbastion.item.GunItem.GunKind.values()) {
+            e.register(com.lastbastion.client.render.weapon.WeaponRenderer.iconModel(k));
+        }
     }
 
     @SubscribeEvent
     public static void keys(RegisterKeyMappingsEvent e) {
         e.register(HERO_COMMAND);
         e.register(PROTOCOLS);
+        e.register(RELOAD);
     }
 }

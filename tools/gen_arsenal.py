@@ -30,6 +30,9 @@ MELEE = [
 ]
 
 
+GUNS = ['ravager', 'thunderboom', 'hellfire', 'starpiercer', 'dragonbreath', 'stormfist', 'glacier', 'sunlance']
+
+
 def write_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
@@ -55,6 +58,17 @@ def main():
             'textures': {'layer0': '%s:item/%s' % (MOD, wid)},
         })
         extra['item.%s.%s' % (MOD, wid)] = name
+    for gid in GUNS:
+        n = 'gun_' + gid
+        write_json(os.path.join(ROOT, 'models', 'item', n + '.json'), {
+            'parent': 'minecraft:builtin/entity',
+            'gui_light': 'front',
+            'textures': {'particle': '%s:item/%s' % (MOD, n)},
+        })
+        write_json(os.path.join(ROOT, 'models', 'item', 'icon', n + '.json'), {
+            'parent': 'minecraft:item/generated',
+            'textures': {'layer0': '%s:item/%s' % (MOD, n)},
+        })
     write_json(os.path.join(HERE, 'lang_extra.json'), dict(sorted(extra.items())))
     lang_path = os.path.join(ROOT, 'lang', 'en_us.json')
     lang = json.load(open(lang_path))
@@ -63,12 +77,12 @@ def main():
     if len(sys.argv) > 1:
         sys.path.insert(0, os.path.join(HERE, 'preview'))
         import icons
-        for wid, _ in MELEE:
+        for wid in [m[0] for m in MELEE] + ['gun_' + g for g in GUNS]:
             src = os.path.join(sys.argv[1], wid + '_big.png')
             if os.path.exists(src):
                 icons.make(src, os.path.join(ROOT, 'textures', 'item', wid + '.png'))
                 print('icon', wid)
-    print('arsenal assets written:', len(MELEE), 'melee weapons')
+    print('arsenal assets written:', len(MELEE), 'melee weapons,', len(GUNS), 'guns')
 
 
 if __name__ == '__main__':

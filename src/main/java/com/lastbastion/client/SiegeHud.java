@@ -19,6 +19,7 @@ public final class SiegeHud implements IGuiOverlay {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.hideGui || mc.player == null) return;
         if (mc.player.getVehicle() instanceof TitanExoEntity exo) exoHud(g, mc.font, exo, w, h);
+        else weaponHud(g, mc, w, h);
         var hud = ClientSiegeState.hud;
         if (hud == null) return;
         Font f = mc.font;
@@ -66,6 +67,59 @@ public final class SiegeHud implements IGuiOverlay {
         }
         int c = ClientSiegeState.creditFlash > 0 ? 0xFFFFA0 : 0xFFD966;
         g.drawString(f, "⛁ " + String.format("%,d", hud.credits()) + " credits", x, y, c, true);
+    }
+
+    /** Readout next to the hotbar for the held arsenal weapon: ammo/heat/reload for guns, Fury and the special for melee. */
+    private void weaponHud(GuiGraphics g, Minecraft mc, int w, int h) {
+        net.minecraft.world.item.ItemStack stack = mc.player.getMainHandItem();
+        Font f = mc.font;
+        int x = w / 2 + 98, y = h - 21;
+        if (stack.getItem() instanceof com.lastbastion.item.GunItem gun) {
+            var k = gun.kind;
+            String line;
+            int col;
+            float frac;
+            if (k.usesHeat()) {
+                int heat = stack.hasTag() ? stack.getTag().getInt(com.lastbastion.item.GunItem.TAG_HEAT) : 0;
+                boolean over = stack.hasTag() && stack.getTag().getBoolean(com.lastbastion.item.GunItem.TAG_OVERHEAT);
+                line = over ? "OVERHEATED" : "HEAT " + heat + "%";
+                col = over ? 0xFF4040 : heat > 70 ? 0xFFA040 : 0xE0E0E0;
+                frac = heat / 100f;
+            } else if (k.mag > 0) {
+                if (com.lastbastion.item.GunItem.reloading(stack)) {
+                    long end = stack.getTag().getLong(com.lastbastion.item.GunItem.TAG_RELOAD);
+                    frac = 1f - Math.max(0, (end - mc.level.getGameTime()) / (float) Math.max(1, gun.reloadTicks(stack)));
+                    line = "RELOADING";
+                    col = 0xFFD966;
+                } else {
+                    int ammo = gun.ammo(stack), mag = gun.magSize(stack);
+                    line = ammo + " / " + mag;
+                    col = ammo == 0 ? 0xFF4040 : ammo <= mag / 4 ? 0xFFA040 : 0xFFFFFF;
+                    frac = ammo / (float) Math.max(1, mag);
+                }
+            } else {
+                boolean charging = mc.player.isUsingItem() && mc.player.getUseItem() == stack;
+                frac = charging ? Math.min(1f, mc.player.getTicksUsingItem() / (float) com.lastbastion.item.GunItem.chargeNeeded(mc.player.isShiftKeyDown())) : 0;
+                line = charging ? (frac >= 1 ? "READY" : "CHARGING") : "RAILGUN";
+                col = frac >= 1 ? 0x7FE8FF : 0xE0E0E0;
+            }
+            g.fill(x - 2, y - 2, x + 64, y + 18, 0x80000000);
+            g.drawString(f, line, x, y, col, true);
+            g.fill(x, y + 11, x + 60, y + 14, 0xFF202020);
+            g.fill(x, y + 11, x + (int) (60 * Mth.clamp(frac, 0, 1)), y + 14, 0xFF000000 | k.color);
+        } else if (stack.getItem() instanceof com.lastbastion.item.weapon.MeleeWeaponItem mw) {
+            var k = mw.kind;
+            boolean reaper = k == com.lastbastion.item.weapon.WeaponKind.SOULREAPER;
+            int val = reaper ? com.lastbastion.item.weapon.MeleeWeaponItem.souls(stack) : com.lastbastion.item.weapon.MeleeWeaponItem.fury(stack);
+            int max = reaper ? com.lastbastion.item.weapon.MeleeWeaponItem.MAX_SOULS : com.lastbastion.item.weapon.MeleeWeaponItem.MAX_FURY;
+            boolean cd = mc.player.getCooldowns().isOnCooldown(mw);
+            boolean ready = !cd && (reaper ? val >= 3 : val >= k.specialFury);
+            g.fill(x - 2, y - 2, x + 84, y + 18, 0x80000000);
+            g.drawString(f, k.special + (ready ? "" : cd ? " ..." : ""), x, y, ready ? k.color : 0x909090, true);
+            g.fill(x, y + 11, x + 80, y + 14, 0xFF202020);
+            g.fill(x, y + 11, x + (int) (80f * val / max), y + 14, reaper ? 0xFF5AFFD8 : ready ? 0xFFFF5030 : 0xFF8A3020);
+            if (!reaper) g.fill(x + (int) (80f * k.specialFury / max), y + 10, x + (int) (80f * k.specialFury / max) + 1, y + 15, 0xFFFFFFFF);
+        }
     }
 
     private void exoHud(GuiGraphics g, Font f, TitanExoEntity exo, int w, int h) {

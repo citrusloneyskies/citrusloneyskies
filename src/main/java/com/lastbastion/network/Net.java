@@ -36,6 +36,8 @@ public final class Net {
                 .encoder(WeaponSwingPacket::encode).decoder(WeaponSwingPacket::new).consumerMainThread(WeaponSwingPacket::handle).add();
         CHANNEL.messageBuilder(WeaponAnimPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(WeaponAnimPacket::encode).decoder(WeaponAnimPacket::new).consumerMainThread(WeaponAnimPacket::handle).add();
+        CHANNEL.messageBuilder(GunReloadPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(GunReloadPacket::encode).decoder(GunReloadPacket::new).consumerMainThread(GunReloadPacket::handle).add();
     }
 
     public static void sendTo(ServerPlayer player, Object msg) {

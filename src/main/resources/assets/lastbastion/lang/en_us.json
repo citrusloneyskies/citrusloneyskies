@@ -125,5 +125,6 @@
   "key.categories.lastbastion": "Last Bastion",
   "key.lastbastion.hero_command": "Order All Heroes",
   "key.lastbastion.protocols": "Core Protocols",
+  "key.lastbastion.reload": "Reload Weapon",
   "msg.lastbastion.core_exists": "A Siege Core already stands at %s. Only one core may exist."
 }
