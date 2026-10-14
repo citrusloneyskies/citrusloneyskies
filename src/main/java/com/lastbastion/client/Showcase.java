@@ -27,6 +27,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
+import com.lastbastion.registry.ModItems;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
@@ -53,9 +62,13 @@ public final class Showcase {
     private static final boolean ENABLED = System.getenv("LB_SHOWCASE") != null;
     private static int stage, ticks, shot;
     private static final int GROUND = -60;
-    static final double ZOMBIE_Z = 0, HERO_Z = 20, TURRET_Z = 40, BOSS_Z = 64, VFX_Z = -24;
+    static final double ZOMBIE_Z = 0, HERO_Z = 20, TURRET_Z = 40, BOSS_Z = 64, VFX_Z = -24, ARSENAL_Z = 100;
 
-    private record Shot(String name, Vec3 pos, float yaw, float pitch) {
+    /** A photo: camera position and angles; {@code hotbar} >= 0 shows the GUI with that hotbar slot selected. */
+    private record Shot(String name, Vec3 pos, float yaw, float pitch, int hotbar) {
+        Shot(String name, Vec3 pos, float yaw, float pitch) {
+            this(name, pos, yaw, pitch, -1);
+        }
     }
 
     private static final List<Shot> SHOTS = new ArrayList<>();
@@ -118,6 +131,16 @@ public final class Showcase {
             }
             SHOTS.add(new Shot(String.format("%02d_boss_%s", n++, bk[i].name().toLowerCase()), new Vec3(bossX(i), y + d.height * 0.6 + 0.5, BOSS_Z - dist), 0, 10));
         }
+        // arsenal: weapon racks, the frame wall, armour sets front and back, and first-person views
+        SHOTS.add(new Shot(String.format("%02d_arsenal_melee", n++), new Vec3(10.5, y + 1.9, ARSENAL_Z - 5.2), 0, 12));
+        SHOTS.add(new Shot(String.format("%02d_arsenal_guns", n++), new Vec3(10.5, y + 1.9, ARSENAL_Z + 6 - 5.2), 0, 12));
+        SHOTS.add(new Shot(String.format("%02d_arsenal_frames", n++), new Vec3(10.5, y + 2.5, ARSENAL_Z + 14 - 6.5), 0, 4));
+        SHOTS.add(new Shot(String.format("%02d_armor_sets", n++), new Vec3(7.5, y + 1.4, ARSENAL_Z + 24 - 5.5), 0, 6));
+        SHOTS.add(new Shot(String.format("%02d_armor_sets_back", n++), new Vec3(7.5, y + 1.4, ARSENAL_Z + 24 + 5.5), 180, 6));
+        int[] fp = {6, 7, 3, 0};
+        for (int slot : fp) {
+            SHOTS.add(new Shot(String.format("%02d_firstperson_%d", n++, slot), new Vec3(-10, y, -14), 0, 4, slot));
+        }
     }
 
     @SubscribeEvent
@@ -152,6 +175,11 @@ public final class Showcase {
                 }
             }
             case 3 -> {
+                Shot cur = SHOTS.get(shot);
+                if (ticks == 2 && mc.player != null) {
+                    mc.options.hideGui = cur.hotbar() < 0;
+                    if (cur.hotbar() >= 0) mc.player.getInventory().selected = cur.hotbar();
+                }
                 if (ticks == 6 && SHOTS.get(shot).name().endsWith("_vfx")) {
                     MinecraftServer server = mc.getSingleplayerServer();
                     if (server != null) server.execute(() -> vfxRow(server.overworld()));
@@ -163,6 +191,7 @@ public final class Showcase {
                     ticks = 0;
                     if (shot >= SHOTS.size()) {
                         stage = 4;
+                        mc.options.hideGui = true;
                         MinecraftServer server = mc.getSingleplayerServer();
                         if (server != null) server.execute(() -> startBattle(server));
                         moveTo(mc, new Shot("battle", new Vec3(-10, GROUND + 12, -20), 0, 30));
@@ -267,6 +296,73 @@ public final class Showcase {
         cd.coreHp = cd.maxHp() * 0.5f;
         cd.shield = cd.maxShield();
         SiegeManager.syncHud(level, cd);
+        buildArsenal(level);
+    }
+
+    private static ArmorStand stand(ServerLevel level, double x, double z, float yaw, String pose) {
+        ArmorStand st = EntityType.ARMOR_STAND.create(level);
+        if (st == null) return null;
+        CompoundTag tag = new CompoundTag();
+        tag.putBoolean("ShowArms", true);
+        tag.putBoolean("NoBasePlate", true);
+        tag.putBoolean("NoGravity", true);
+        tag.putBoolean("Invulnerable", true);
+        try {
+            tag.put("Pose", net.minecraft.nbt.TagParser.parseTag(pose));
+        } catch (Exception ignored) {
+        }
+        st.load(tag);
+        st.moveTo(x, GROUND, z, yaw, 0);
+        st.setYBodyRot(yaw);
+        st.setYHeadRot(yaw);
+        level.addFreshEntity(st);
+        return st;
+    }
+
+    /** Weapon racks (armour stands), a wall of item frames and the armour sets on stands. */
+    private static void buildArsenal(ServerLevel level) {
+        String hold = "{RightArm:[-70f,0f,0f],LeftArm:[-20f,0f,-10f]}";
+        com.lastbastion.item.weapon.WeaponKind[] wk = com.lastbastion.item.weapon.WeaponKind.values();
+        for (int i = 0; i < wk.length; i++) {
+            ArmorStand st = stand(level, 3 + i * 2.2, ARSENAL_Z, 180, hold);
+            if (st != null) st.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ModItems.MELEE.get(wk[i]).get()));
+        }
+        String aim = "{RightArm:[-90f,-10f,0f],LeftArm:[-80f,40f,0f]}";
+        com.lastbastion.item.GunItem.GunKind[] gk = com.lastbastion.item.GunItem.GunKind.values();
+        for (int i = 0; i < gk.length; i++) {
+            ArmorStand st = stand(level, 3 + i * 2.2, ARSENAL_Z + 6, 180, aim);
+            if (st != null) st.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ModItems.GUNS.get(gk[i]).get()));
+        }
+        // frame wall: a stone wall with two rows of frames facing the camera (north)
+        int wz = (int) Math.floor(ARSENAL_Z + 14);
+        for (int x = 1; x <= 20; x++) for (int yy = 0; yy < 5; yy++) level.setBlock(new BlockPos(x, GROUND + yy, wz), Blocks.POLISHED_DEEPSLATE.defaultBlockState(), 3);
+        for (int i = 0; i < 16; i++) {
+            BlockPos at = new BlockPos(3 + (i % 8) * 2, GROUND + (i < 8 ? 3 : 1), wz - 1);
+            ItemFrame f = new ItemFrame(level, at, Direction.NORTH);
+            f.setItem(i < 8 ? new ItemStack(ModItems.MELEE.get(wk[i]).get()) : new ItemStack(ModItems.GUNS.get(gk[i - 8]).get()), false);
+            level.addFreshEntity(f);
+        }
+        com.lastbastion.item.armor.ArmorSet[] sets = com.lastbastion.item.armor.ArmorSet.values();
+        EquipmentSlot[] slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+        for (int i = 0; i < sets.length; i++) {
+            ArmorStand st = stand(level, 2.5 + i * 2.0, ARSENAL_Z + 24, 180, "{RightArm:[-10f,0f,10f],LeftArm:[-10f,0f,-10f]}");
+            if (st == null) continue;
+            for (int j = 0; j < 4; j++) st.setItemSlot(slots[j], new ItemStack(ModItems.ARMOR.get(sets[i]).get(j).get()));
+            st.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(ModItems.MELEE.get(wk[(i + 2) % wk.length]).get()));
+        }
+        // hotbar for the first-person shots
+        for (ServerPlayer p : level.players()) {
+            p.getInventory().setItem(0, new ItemStack(ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.DAWNBREAKER).get()));
+            p.getInventory().setItem(1, new ItemStack(ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.VOIDEDGE).get()));
+            p.getInventory().setItem(2, new ItemStack(ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.EARTHSHAKER).get()));
+            p.getInventory().setItem(3, new ItemStack(ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.SOULREAPER).get()));
+            p.getInventory().setItem(4, new ItemStack(ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.STORMPIERCER).get()));
+            p.getInventory().setItem(5, new ItemStack(ModItems.GUNS.get(com.lastbastion.item.GunItem.GunKind.STARPIERCER).get()));
+            p.getInventory().setItem(6, new ItemStack(ModItems.MELEE.get(com.lastbastion.item.weapon.WeaponKind.DAWNBREAKER).get()));
+            p.getInventory().setItem(7, new ItemStack(ModItems.GUNS.get(com.lastbastion.item.GunItem.GunKind.RAVAGER).get()));
+            p.getInventory().setItem(8, new ItemStack(ModItems.GUNS.get(com.lastbastion.item.GunItem.GunKind.HELLFIRE).get()));
+            for (int j = 0; j < 4; j++) p.setItemSlot(slots[j], new ItemStack(ModItems.ARMOR.get(com.lastbastion.item.armor.ArmorSet.VANGUARD).get(j).get()));
+        }
     }
 
     /** A row of long-lived test effects so the VFX renderer can be checked in one picture. */

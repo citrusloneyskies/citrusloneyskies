@@ -75,7 +75,7 @@ public final class GunAnimations {
         float reload = 0;
         if (main && GunItem.reloading(stack) && stack.getTag() != null) {
             long end = stack.getTag().getLong(GunItem.TAG_RELOAD);
-            float total = Math.max(1, gun.reloadTicks(stack));
+            float total = Math.max(1, gun.reloadLength(stack));
             reload = 1f - Math.max(0, (end - player.level().getGameTime() - pt) / total);
         }
         float charge = 0;

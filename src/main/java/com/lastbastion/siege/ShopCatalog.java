@@ -24,7 +24,7 @@ import java.util.function.Supplier;
 /** Everything the Siege Core sells. Shared between the client screen and the server purchase handler. */
 public final class ShopCatalog {
     public enum Category {
-        TURRETS("Turrets", 0xFFB000), HEROES("Heroes", 0xFFD966), ARSENAL("Arsenal", 0xFF5050), SUPPORT("Support", 0x7FE8FF),
+        TURRETS("Turrets", 0xFFB000), HEROES("Heroes", 0xFFD966), ARSENAL("Arsenal", 0xFF5050), ARMORY("Armory", 0x6FA8FF), SUPPORT("Support", 0x7FE8FF),
         SUPPLIES("Supplies", 0x7CFF9B), FORTIFY("Fortify", 0xC8A070), CORE("Core", 0xC86BFF);
         public final String title;
         public final int color;
@@ -122,8 +122,15 @@ public final class ShopCatalog {
             l.add(new Entry("gun_" + g.name().toLowerCase(Locale.ROOT), Category.ARSENAL, g.title, g.cost,
                     stack(ModItems.GUNS.get(g), 1), stack(ModItems.GUNS.get(g), 1), null, g.desc, "Damage " + g.damage));
         }
-        l.add(new Entry("vanguard_armor", Category.ARSENAL, "Vanguard Armor Set", 900, () -> new ItemStack(Items.DIAMOND_CHESTPLATE), ShopCatalog::vanguardBundle, null,
-                "Full diamond armor with Protection III. Delivered as a bundle of 4 pieces."));
+        for (com.lastbastion.item.armor.ArmorSet set : com.lastbastion.item.armor.ArmorSet.values()) {
+            int[] d = set.defence;
+            l.add(new Entry("armor_" + set.id, Category.ARMORY, set.title, set.cost, stack(ModItems.ARMOR.get(set).get(1), 1), null, null,
+                    "Full set: " + set.pieceName(0) + ", " + set.pieceName(1) + ", " + set.pieceName(2) + ", " + set.pieceName(3) + ".",
+                    "Armor " + (d[0] + d[1] + d[2] + d[3]) + (set.toughness > 0 ? "   Toughness " + (int) (set.toughness * 4) : "")
+                            + (set.knockbackResistance > 0 ? "   Knockback resist " + Math.round(set.knockbackResistance * 400) + "%" : "") + "   Unbreakable",
+                    "Set bonus - " + set.bonus + ": " + set.bonusDesc,
+                    set.lore));
+        }
         l.add(new Entry("bastion_shield", Category.ARSENAL, "Bastion Tower Shield", 120, () -> new ItemStack(Items.SHIELD), () -> {
             ItemStack s = new ItemStack(Items.SHIELD);
             s.enchant(Enchantments.UNBREAKING, 3);
@@ -186,22 +193,6 @@ public final class ShopCatalog {
         byId = m;
     }
 
-    private static ItemStack vanguardBundle() {
-        return new ItemStack(Items.DIAMOND_CHESTPLATE);
-    }
-
-    private static List<ItemStack> vanguardSet() {
-        List<ItemStack> out = new ArrayList<>();
-        for (var item : List.of(Items.DIAMOND_HELMET, Items.DIAMOND_CHESTPLATE, Items.DIAMOND_LEGGINGS, Items.DIAMOND_BOOTS)) {
-            ItemStack s = new ItemStack(item);
-            s.enchant(Enchantments.ALL_DAMAGE_PROTECTION, 3);
-            s.enchant(Enchantments.UNBREAKING, 3);
-            s.setHoverName(Component.literal("Vanguard " + s.getHoverName().getString().replace("Diamond ", "")).withStyle(ChatFormatting.AQUA));
-            out.add(s);
-        }
-        return out;
-    }
-
     /** Server-side purchase. Returns a message for the player. */
     public static Component purchase(ServerPlayer player, String id, int arg) {
         ServerLevel level = player.serverLevel();
@@ -244,8 +235,10 @@ public final class ShopCatalog {
             SiegeManager.syncHud(level, d);
             return Component.literal("Core repaired.").withStyle(ChatFormatting.GREEN);
         }
-        if (id.equals("vanguard_armor")) {
-            for (ItemStack s : vanguardSet()) give(player, s);
+        if (e.category == Category.ARMORY) {
+            for (var piece : ModItems.ARMOR.get(com.lastbastion.item.armor.ArmorSet.valueOf(id.substring(6).toUpperCase(Locale.ROOT)))) {
+                give(player, new ItemStack(piece.get()));
+            }
         } else {
             give(player, e.reward.get());
         }

@@ -32,6 +32,16 @@ MELEE = [
 
 GUNS = ['ravager', 'thunderboom', 'hellfire', 'starpiercer', 'dragonbreath', 'stormfist', 'glacier', 'sunlance']
 
+SLOTS = ['helmet', 'chestplate', 'leggings', 'boots']
+ARMOR = {
+    'scavenger': ['Scavenger Goggles', 'Scavenger Jacket', 'Scavenger Trousers', 'Scavenger Boots'],
+    'shadowstalker': ['Shadowstalker Hood', 'Shadowstalker Jerkin', 'Shadowstalker Leggings', 'Shadowstalker Treads'],
+    'arcanist': ['Arcanist Circlet', 'Arcanist Robe', 'Arcanist Skirts', 'Arcanist Slippers'],
+    'vanguard': ['Vanguard Greathelm', 'Vanguard Cuirass', 'Vanguard Greaves', 'Vanguard Sabatons'],
+    'sunforged': ['Sunforged Crown-Helm', 'Sunforged Breastplate', 'Sunforged Legplates', 'Sunforged Sabatons'],
+    'titan': ['Titan Helm Unit', 'Titan Torso Frame', 'Titan Leg Actuators', 'Titan Stabilisers'],
+}
+
 
 def write_json(path, obj):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -69,6 +79,14 @@ def main():
             'parent': 'minecraft:item/generated',
             'textures': {'layer0': '%s:item/%s' % (MOD, n)},
         })
+    for set_id, names in ARMOR.items():
+        for slot, name in zip(SLOTS, names):
+            n = set_id + '_' + slot
+            write_json(os.path.join(ROOT, 'models', 'item', n + '.json'), {
+                'parent': 'minecraft:item/generated',
+                'textures': {'layer0': '%s:item/%s' % (MOD, n)},
+            })
+            extra['item.%s.%s' % (MOD, n)] = name
     write_json(os.path.join(HERE, 'lang_extra.json'), dict(sorted(extra.items())))
     lang_path = os.path.join(ROOT, 'lang', 'en_us.json')
     lang = json.load(open(lang_path))
@@ -77,12 +95,13 @@ def main():
     if len(sys.argv) > 1:
         sys.path.insert(0, os.path.join(HERE, 'preview'))
         import icons
-        for wid in [m[0] for m in MELEE] + ['gun_' + g for g in GUNS]:
+        armor = [a + '_' + sl for a in ARMOR for sl in SLOTS]
+        for wid in [m[0] for m in MELEE] + ['gun_' + g for g in GUNS] + armor:
             src = os.path.join(sys.argv[1], wid + '_big.png')
             if os.path.exists(src):
                 icons.make(src, os.path.join(ROOT, 'textures', 'item', wid + '.png'))
                 print('icon', wid)
-    print('arsenal assets written:', len(MELEE), 'melee weapons,', len(GUNS), 'guns')
+    print('arsenal assets written:', len(MELEE), 'melee weapons,', len(GUNS), 'guns,', len(ARMOR) * 4, 'armour pieces')
 
 
 if __name__ == '__main__':

@@ -350,4 +350,61 @@ public final class SiegeGameTests {
             else h.fail(fails.toString());
         });
     }
+
+    /** Every armour set: pieces add their armour, the full set activates its bonus, and the shop sells whole sets. */
+    @GameTest(template = "arena", timeoutTicks = 60, batch = "siege_armor")
+    public static void armorSets(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        StringBuilder fails = new StringBuilder();
+        net.minecraft.world.entity.EquipmentSlot[] slots = {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+                net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET};
+        for (com.lastbastion.item.armor.ArmorSet set : com.lastbastion.item.armor.ArmorSet.values()) {
+            net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                    new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "armor_" + set.id));
+            p.moveTo(core.getX() + 3.5, core.getY() + 2, core.getZ() + 0.5);
+            double before = p.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);
+            for (int i = 0; i < 4; i++) {
+                net.minecraft.world.item.ItemStack piece = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.ARMOR.get(set).get(i).get());
+                p.setItemSlot(slots[i], piece);
+                p.getAttributes().addTransientAttributeModifiers(piece.getAttributeModifiers(slots[i]));
+            }
+            double gained = p.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR) - before;
+            int expected = set.defence[0] + set.defence[1] + set.defence[2] + set.defence[3];
+            if (Math.abs(gained - expected) > 0.01) fails.append(set.id).append(" armor ").append(gained).append("!=").append(expected).append("; ");
+            if (com.lastbastion.item.armor.ArmorSets.fullSet(p) != set) fails.append(set.id).append(" set not detected; ");
+            switch (set) {
+                case SCAVENGER -> {
+                    if (com.lastbastion.item.armor.ArmorSets.creditMult(p) <= 1f) fails.append("scavenger bonus missing; ");
+                }
+                case SHADOWSTALKER -> {
+                    if (com.lastbastion.item.armor.ArmorSets.critMult(p) <= 1.5f) fails.append("shadowstalker bonus missing; ");
+                }
+                case ARCANIST -> {
+                    if (com.lastbastion.item.armor.ArmorSets.cooldownMult(p) >= 1f) fails.append("arcanist bonus missing; ");
+                }
+                case TITAN -> {
+                    com.lastbastion.item.armor.ArmorSets.jumpJet(p);
+                    if (p.getPersistentData().getInt("lb_jets") != 1) fails.append("titan jets did not fire; ");
+                }
+                default -> {
+                }
+            }
+        }
+        net.minecraft.server.level.ServerPlayer buyer = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "armor_buyer"));
+        buyer.moveTo(core.getX() + 2.5, core.getY(), core.getZ() + 0.5);
+        SiegeData d = SiegeManager.data(level);
+        d.credits.put(buyer.getUUID(), 10000);
+        com.lastbastion.siege.ShopCatalog.purchase(buyer, "armor_vanguard", 0);
+        int pieces = 0;
+        for (var piece : com.lastbastion.registry.ModItems.ARMOR.get(com.lastbastion.item.armor.ArmorSet.VANGUARD)) {
+            pieces += buyer.getInventory().countItem(piece.get());
+        }
+        if (pieces != 4) fails.append("bought vanguard set has ").append(pieces).append(" pieces; ");
+        if (d.credits(buyer.getUUID()) != 10000 - com.lastbastion.item.armor.ArmorSet.VANGUARD.cost) fails.append("wrong armour price; ");
+        teardown(h, core);
+        if (fails.length() == 0) h.succeed();
+        else h.fail(fails.toString());
+    }
 }

@@ -103,7 +103,8 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         }
     }
 
-    public static final String TAG_AMMO = "lbAmmo", TAG_RELOAD = "lbReload", TAG_HEAT = "heat", TAG_OVERHEAT = "overheated", TAG_INCENDIARY = "lbInc";
+    public static final String TAG_AMMO = "lbAmmo", TAG_RELOAD = "lbReload", TAG_RELOAD_LEN = "lbReloadLen", TAG_HEAT = "heat", TAG_OVERHEAT = "overheated",
+            TAG_INCENDIARY = "lbInc";
 
     public final GunKind kind;
 
@@ -138,6 +139,12 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         return Math.round(kind.reloadTicks * (Arsenal.ascended(stack) ? 0.7f : 1f));
     }
 
+    /** Length of the reload in progress (ticks), for progress displays. */
+    public int reloadLength(ItemStack stack) {
+        CompoundTag t = stack.getTag();
+        return t != null && t.getInt(TAG_RELOAD_LEN) > 0 ? t.getInt(TAG_RELOAD_LEN) : reloadTicks(stack);
+    }
+
     public int ammo(ItemStack stack) {
         CompoundTag t = stack.getTag();
         return t == null || !t.contains(TAG_AMMO) ? magSize(stack) : t.getInt(TAG_AMMO);
@@ -155,7 +162,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
     /** Starts a reload (server). Returns false if the magazine is already full or it is reloading. */
     public boolean startReload(Level level, Player p, ItemStack stack) {
         if (kind.mag <= 0 || reloading(stack) || ammo(stack) >= magSize(stack)) return false;
-        stack.getOrCreateTag().putLong(TAG_RELOAD, level.getGameTime() + reloadTicks(stack));
+        int len = Math.max(1, Math.round(reloadTicks(stack) * com.lastbastion.item.armor.ArmorSets.reloadMult(p)));
+        stack.getOrCreateTag().putLong(TAG_RELOAD, level.getGameTime() + len);
+        stack.getOrCreateTag().putInt(TAG_RELOAD_LEN, len);
         level.playSound(null, p.blockPosition(), reloadSound(), SoundSource.PLAYERS, 0.8f, 1.0f);
         return true;
     }

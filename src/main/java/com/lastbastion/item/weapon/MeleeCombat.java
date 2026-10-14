@@ -145,7 +145,7 @@ public final class MeleeCombat {
         boolean crit = strength > 0.9f && p.fallDistance > 0 && !p.onGround() && !p.onClimbable() && !p.isInWater() && !p.isPassenger()
                 && !p.hasEffect(MobEffects.BLINDNESS);
         if (k == WeaponKind.VOIDEDGE && strong && level.random.nextFloat() < 0.15f) crit = true;
-        if (crit) dmg *= 1.5f;
+        if (crit) dmg *= com.lastbastion.item.armor.ArmorSets.critMult(p);
         if (finisher) dmg *= 1.3f;
         if (now < st.edgeUntil) dmg *= 1.25f;
 
@@ -158,7 +158,7 @@ public final class MeleeCombat {
         }
         if (landed > 0) {
             st.hits += landed;
-            if (strong) gainFury(stack, k, landed, now);
+            if (strong) gainFury(p, stack, k, landed, now);
             hitSound(level, p, k, crit, finisher);
             if (crit) level.sendParticles(ParticleTypes.CRIT, targets.get(0).getX(), targets.get(0).getY() + targets.get(0).getBbHeight() * 0.6,
                     targets.get(0).getZ(), 10, 0.3, 0.3, 0.3, 0.2);
@@ -303,10 +303,10 @@ public final class MeleeCombat {
         return true;
     }
 
-    static void gainFury(ItemStack stack, WeaponKind k, int landed, long now) {
+    static void gainFury(Player p, ItemStack stack, WeaponKind k, int landed, long now) {
         if (k == WeaponKind.SOULREAPER) return;
         int per = Mth.clamp(Math.round(8f / k.attacksPerSecond), 3, 12);
-        int gain = per + (landed - 1) * per / 2;
+        int gain = Math.round((per + (landed - 1) * per / 2) * com.lastbastion.item.armor.ArmorSets.furyMult(p));
         MeleeWeaponItem.setFury(stack, MeleeWeaponItem.fury(stack) + gain, now);
     }
 
@@ -425,7 +425,7 @@ public final class MeleeCombat {
     }
 
     static void cooldown(ServerPlayer p, ItemStack stack, WeaponKind k, int ticks) {
-        p.getCooldowns().addCooldown(stack.getItem(), ticks);
+        p.getCooldowns().addCooldown(stack.getItem(), Math.max(1, Math.round(ticks * com.lastbastion.item.armor.ArmorSets.cooldownMult(p))));
     }
 
     /** Right-click special for instant abilities. Returns false if it could not be used. */

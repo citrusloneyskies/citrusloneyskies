@@ -514,6 +514,7 @@ public final class SiegeManager {
         float mult = SiegeConfig.CREDIT_MULTIPLIER.get().floatValue() * (1f + 0.1f * d.level(CoreUpgrade.TREASURY));
         if (d.state == SiegeState.WAVE) mult *= d.modifier.creditMult;
         if (kill && popupAt != null && com.lastbastion.block.SupportBlock.harvesterNear(popupAt)) mult *= 1.25f;
+        if (kill) mult *= com.lastbastion.item.armor.ArmorSets.creditMult(level.getPlayerByUUID(player));
         int amount = Math.max(1, Math.round(base * mult));
         d.addCredits(player, amount);
         if (popupAt != null && level.getPlayerByUUID(player) instanceof ServerPlayer sp) {

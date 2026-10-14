@@ -88,7 +88,7 @@ public final class SiegeHud implements IGuiOverlay {
             } else if (k.mag > 0) {
                 if (com.lastbastion.item.GunItem.reloading(stack)) {
                     long end = stack.getTag().getLong(com.lastbastion.item.GunItem.TAG_RELOAD);
-                    frac = 1f - Math.max(0, (end - mc.level.getGameTime()) / (float) Math.max(1, gun.reloadTicks(stack)));
+                    frac = 1f - Math.max(0, (end - mc.level.getGameTime()) / (float) Math.max(1, gun.reloadLength(stack)));
                     line = "RELOADING";
                     col = 0xFFD966;
                 } else {
