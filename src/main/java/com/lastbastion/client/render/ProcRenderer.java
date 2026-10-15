@@ -116,6 +116,8 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
 
     @Override
     public void render(T entity, float yaw, float pt, PoseStack pose, MultiBufferSource buffers, int light) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
         model.level = levelFn.applyAsInt(entity);
         rgba[0] = rgba[1] = rgba[2] = rgba[3] = 1f;
         if (tint != null) tint.apply(entity, rgba);
@@ -127,6 +129,10 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
         if (pre != null) pre.apply(entity, pose, pt);
         super.render(entity, yaw, pt, pose, buffers, light);
         pose.popPose();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ProcRenderer.render", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
+        }
     }
 
     @Nullable
@@ -154,11 +160,17 @@ public class ProcRenderer<T extends Mob> extends MobRenderer<T, ProcModel<T>> {
         @Override
         public void render(PoseStack pose, MultiBufferSource buffers, int light, T entity, float limbSwing, float limbAmount, float pt,
                            float age, float yaw, float pitch) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
             if (entity.isInvisible()) return;
             VertexConsumer vc = buffers.getBuffer(RenderType.eyes(tex));
             float a = owner.glowAlphaFor(entity);
             getParentModel().renderRaw(pose, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, a, a, a, 1f);
+                } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ProcRenderer.render", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
         }
+    }
     }
 
     public static <T extends Mob> RenderLayerParent<T, ProcModel<T>> parent(ProcRenderer<T> r) {

@@ -169,6 +169,8 @@ public class CoreScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         g.fill(left, top, left + w, top + h, 0xE0101418);
         g.fill(left, top, left + w, top + 1, 0xFF6FE3FF);
@@ -195,6 +197,10 @@ public class CoreScreen extends Screen {
         if (tab < COMMAND_TAB) renderShop(g, mx, my);
         else renderCommand(g);
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("CoreScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     private void renderShop(GuiGraphics g, int mx, int my) {

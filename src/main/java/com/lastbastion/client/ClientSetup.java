@@ -38,6 +38,7 @@ public final class ClientSetup {
 
     @SubscribeEvent
     public static void renderers(EntityRenderersEvent.RegisterRenderers e) {
+        try {
         for (ZombieKind k : ZombieKind.values()) e.registerEntityRenderer(ModEntities.ZOMBIES.get(k).get(), ctx -> ZombieModels.renderer(ctx, k));
         for (BossKind k : BossKind.values()) e.registerEntityRenderer(ModEntities.BOSSES.get(k).get(), ctx -> BossModels.renderer(ctx, k));
         for (TurretKind k : TurretKind.values()) e.registerEntityRenderer(ModEntities.TURRETS.get(k).get(), ctx -> TurretModels.renderer(ctx, k));
@@ -55,34 +56,53 @@ public final class ClientSetup {
         e.registerEntityRenderer(ModEntities.HELLHOUND.get(), ctx -> com.lastbastion.client.model.HellspawnModels.renderer(ctx, com.lastbastion.entity.hero.HellspawnEntity.Variant.HELLHOUND));
         e.registerEntityRenderer(ModEntities.FIEND.get(), ctx -> com.lastbastion.client.model.HellspawnModels.renderer(ctx, com.lastbastion.entity.hero.HellspawnEntity.Variant.FIEND));
         e.registerBlockEntityRenderer(ModBlockEntities.SIEGE_CORE.get(), CoreCrystalRenderer::new);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientSetup.renderers", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void overlays(RegisterGuiOverlaysEvent e) {
+        try {
         e.registerAboveAll("siege_hud", SiegeHud.INSTANCE);
         e.registerBelowAll("vfx_flash", com.lastbastion.client.fx.ScreenFlash.INSTANCE);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientSetup.overlays", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void particles(net.minecraftforge.client.event.RegisterParticleProvidersEvent e) {
+        try {
         e.registerSpriteSet(com.lastbastion.registry.ModParticles.FX.get(), com.lastbastion.client.fx.FxParticle.Provider::new);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientSetup.particles", lbCrash);
+        }
     }
 
     /** Inventory sprites for the 3D weapons (drawn by the weapon renderer in GUI slots). */
     @SubscribeEvent
     public static void extraModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional e) {
+        try {
         for (com.lastbastion.item.weapon.WeaponKind k : com.lastbastion.item.weapon.WeaponKind.values()) {
             e.register(com.lastbastion.client.render.weapon.WeaponRenderer.iconModel(k));
         }
         for (com.lastbastion.item.GunItem.GunKind k : com.lastbastion.item.GunItem.GunKind.values()) {
             e.register(com.lastbastion.client.render.weapon.WeaponRenderer.iconModel(k));
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientSetup.extraModels", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void keys(RegisterKeyMappingsEvent e) {
+        try {
         e.register(HERO_COMMAND);
         e.register(PROTOCOLS);
         e.register(RELOAD);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientSetup.keys", lbCrash);
+        }
     }
 }

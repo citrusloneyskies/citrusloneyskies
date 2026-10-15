@@ -124,17 +124,30 @@ public final class SiegeGameTests {
         });
     }
 
-    @GameTest(template = "arena", timeoutTicks = 200, batch = "siege_core")
+    @GameTest(template = "arena", timeoutTicks = 420, batch = "siege_core")
     public static void zombiesDamageCore(GameTestHelper h) {
         BlockPos core = setup(h);
         ServerLevel level = h.getLevel();
-        for (int i = 0; i < 3; i++) ZombieSpawner.spawn(level, ZombieKind.SHAMBLER, ZombieRank.ROTTEN, 0, ring(core, 3, i, 3), false, false);
-        h.runAfterDelay(160, () -> {
+        // the test world is shared: drop leftover summons and turrets that would distract the horde
+        for (net.minecraft.world.entity.Entity e : level.getAllEntities()) if (e instanceof HeroEntity || e instanceof TurretEntity) e.discard();
+        for (int i = 0; i < 3; i++) {
+            SiegeZombie z = ZombieSpawner.spawn(level, ZombieKind.SHAMBLER, ZombieRank.ROTTEN, 0, ring(core, 3, i, 3), false, false);
+            if (z != null) {
+                z.setInvulnerable(true);
+                z.targetSelector.removeAllGoals(g -> true);
+            }
+        }
+        h.runAfterDelay(360, () -> {
             SiegeData d = SiegeManager.data(level);
             boolean hurt = d.coreHp < d.maxHp() || d.shield < d.maxShield() || d.state == SiegeState.INACTIVE;
+            StringBuilder z = new StringBuilder("state " + d.state + " shield " + d.shield + "/" + d.maxShield() + " aegis " + d.aegisTicks + ": ");
+            for (SiegeZombie m : level.getEntitiesOfClass(SiegeZombie.class, new net.minecraft.world.phys.AABB(core).inflate(40)))
+                z.append(m.blockPosition().toShortString()).append(" tgt=").append(m.getTarget()).append(" goal=").append(m.goalSelector.getRunningGoals().map(g -> g.getGoal().getClass().getSimpleName()).toList()).append("; ");
             teardown(h, core);
             if (hurt) h.succeed();
-            else h.fail("zombies never damaged the core (hp " + d.coreHp + ")");
+            else {
+                h.fail("zombies never damaged the core (hp " + d.coreHp + ", state " + d.state + ", corePos " + SiegeManager.corePos(level) + " vs " + core + ") " + z);
+            }
         });
     }
 

@@ -32,9 +32,15 @@ public class HeroCommandScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         g.drawCenteredString(font, "Order all your heroes and devils:", width / 2, height / 2 - 46, 0xFFD966);
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HeroCommandScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     @Override

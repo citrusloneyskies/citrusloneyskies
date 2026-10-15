@@ -35,7 +35,11 @@ public record VfxPacket(VfxKind kind, double x, double y, double z, double x2, d
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> VfxManager.add(this));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("VfxPacket.handle", lbCrash);
+        }
     }
 }

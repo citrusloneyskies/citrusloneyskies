@@ -56,12 +56,16 @@ public final class Companions {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onAttack(LivingAttackEvent e) {
+        try {
         if (e.isCanceled() || !(e.getEntity().level() instanceof ServerLevel level)) return;
         Entity src = e.getSource().getEntity();
         long now = level.getGameTime();
         if (src instanceof ServerPlayer p && !(p instanceof FakePlayer) && e.getEntity() != p) STRUCK.put(p.getUUID(), new Mark(e.getEntity().getId(), now));
         if (e.getEntity() instanceof ServerPlayer p && !(p instanceof FakePlayer) && src instanceof LivingEntity && src != p) {
             STRUCK_BY.put(p.getUUID(), new Mark(src.getId(), now));
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Companions.onAttack", lbCrash);
         }
     }
 
@@ -177,18 +181,30 @@ public final class Companions {
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
+        try {
         if (e.getEntity() instanceof ServerPlayer p) deliverMail(p);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Companions.onLogin", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent e) {
+        try {
         if (e.getEntity() instanceof ServerPlayer p) deliverMail(p);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Companions.onRespawn", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent e) {
+        try {
         STRUCK.remove(e.getEntity().getUUID());
         STRUCK_BY.remove(e.getEntity().getUUID());
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Companions.onLogout", lbCrash);
+        }
     }
 
     // ------------------------------------------------------------------ limits
@@ -270,6 +286,7 @@ public final class Companions {
     /** Summons on Follow orders step through the portal right behind their summoner. */
     @SubscribeEvent
     public static void onChangeDimension(PlayerEvent.PlayerChangedDimensionEvent e) {
+        try {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         ServerLevel from = p.server.getLevel(e.getFrom()), to = p.server.getLevel(e.getTo());
         if (from == null || to == null) return;
@@ -298,6 +315,9 @@ public final class Companions {
                 }
             });
             if (moved != null) Vfx.spray(to, FxStyle.STAR, at.add(0, 1, 0), 0xFFFFFF, h.kind.color, 0.25f, 12, 0.2f, 0);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Companions.onChangeDimension", lbCrash);
         }
     }
 

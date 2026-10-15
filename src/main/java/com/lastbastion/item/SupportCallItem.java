@@ -98,6 +98,10 @@ public class SupportCallItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         tip.add(Component.literal(kind.desc).withStyle(ChatFormatting.GRAY));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SupportCallItem.appendHoverText", lbCrash);
+        }
     }
 }

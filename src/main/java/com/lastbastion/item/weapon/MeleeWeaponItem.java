@@ -127,15 +127,23 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void onUseTick(Level level, LivingEntity user, ItemStack stack, int remaining) {
+        try {
         if (level instanceof ServerLevel sl && user instanceof ServerPlayer sp) {
             MeleeCombat.chargeTick(sl, sp, stack, kind, getUseDuration(stack) - remaining);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeWeaponItem.onUseTick", lbCrash);
         }
     }
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity user, int remaining) {
+        try {
         if (level instanceof ServerLevel sl && user instanceof ServerPlayer sp) {
             MeleeCombat.releaseCharge(sl, sp, stack, kind, getUseDuration(stack) - remaining);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeWeaponItem.releaseUsing", lbCrash);
         }
     }
 
@@ -153,12 +161,16 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
+        try {
         if (level.isClientSide || level.getGameTime() % 20 != 0) return;
         CompoundTag t = stack.getTag();
         if (t == null) return;
         int fury = t.getInt(TAG_FURY);
         if (fury > 0 && level.getGameTime() - t.getLong(TAG_FURY_TIME) > 160) {
             t.putInt(TAG_FURY, Math.max(0, fury - 2));
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeWeaponItem.inventoryTick", lbCrash);
         }
     }
 
@@ -203,6 +215,7 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         int mk = Arsenal.mk(stack);
         tip.add(Component.literal(className(kind.weaponClass) + "  •  " + elementName(kind) + "  •  Mk " + Arsenal.roman(mk))
                 .withStyle(ChatFormatting.DARK_GRAY));
@@ -226,6 +239,9 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
             tip.add(Component.literal("Fury: " + fury(stack) + "/" + MAX_FURY).withStyle(ChatFormatting.DARK_RED));
         }
         tip.add(Component.literal(kind.lore).withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeWeaponItem.appendHoverText", lbCrash);
+        }
     }
 
     static String className(WeaponKind.WeaponClass c) {

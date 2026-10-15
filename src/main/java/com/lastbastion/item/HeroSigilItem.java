@@ -199,6 +199,7 @@ public class HeroSigilItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         if (kind.devil) tip.add(Component.literal("DEVIL PACT").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
         tip.add(Component.literal(kind.desc).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal(kind.moves).withStyle(kind.devil ? ChatFormatting.RED : ChatFormatting.DARK_AQUA));
@@ -217,5 +218,8 @@ public class HeroSigilItem extends Item {
         }
         tip.add(Component.literal("Right-click to summon - anywhere. Near a Siege Core it guards the core; elsewhere it follows you.")
                 .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HeroSigilItem.appendHoverText", lbCrash);
+        }
     }
 }

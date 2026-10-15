@@ -78,6 +78,7 @@ public final class Downed {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onDeath(LivingDeathEvent e) {
+        try {
         if (executing || !(e.getEntity() instanceof ServerPlayer p) || p instanceof FakePlayer) return;
         if (e.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             // the void and /kill are final
@@ -95,6 +96,9 @@ public final class Downed {
         if (!eligible(p)) return;
         e.setCanceled(true);
         down(p, byHorde(e.getSource()));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onDeath", lbCrash);
+        }
     }
 
     /** A blow from the horde (or its projectiles), as opposed to a fall, a teammate's stray shot or a lava dip. */
@@ -159,6 +163,7 @@ public final class Downed {
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p)) return;
         State s = DOWNED.get(p.getUUID());
         if (s == null) return;
@@ -210,6 +215,9 @@ public final class Downed {
         }
         if (p.tickCount % 5 == 0) sync(p, s);
         if (s.bleed <= 0) bleedOut(p);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onPlayerTick", lbCrash);
+        }
     }
 
     private static String bar(int v, int max) {
@@ -290,6 +298,7 @@ public final class Downed {
     /** Downed players take no direct damage; hits only shorten the bleed-out. */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onAttacked(LivingAttackEvent e) {
+        try {
         if (e.getEntity() instanceof ServerPlayer p) {
             State s = DOWNED.get(p.getUUID());
             if (s != null && !e.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
@@ -301,52 +310,91 @@ public final class Downed {
             }
         }
         if (e.getSource().getEntity() instanceof ServerPlayer attacker && isDowned(attacker)) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onAttacked", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onTarget(LivingChangeTargetEvent e) {
+        try {
         if (e.getNewTarget() instanceof Player p && !p.level().isClientSide && isDowned(p)) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onTarget", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onAttack(AttackEntityEvent e) {
+        try {
         if (isDowned(e.getEntity())) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onAttack", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onUseItem(PlayerInteractEvent.RightClickItem e) {
+        try {
         if (!e.getLevel().isClientSide && isDowned(e.getEntity())) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onUseItem", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onUseBlock(PlayerInteractEvent.RightClickBlock e) {
+        try {
         if (!e.getLevel().isClientSide && isDowned(e.getEntity())) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onUseBlock", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onUseEntity(PlayerInteractEvent.EntityInteract e) {
+        try {
         if (!e.getLevel().isClientSide && isDowned(e.getEntity())) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onUseEntity", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onBreak(BlockEvent.BreakEvent e) {
+        try {
         if (isDowned(e.getPlayer())) e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onBreak", lbCrash);
+        }
     }
 
     /** Disconnecting or leaving the dimension stands the player back up rather than killing them. */
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent e) {
+        try {
         if (e.getEntity() instanceof ServerPlayer p) clear(p, true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onLogout", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onChangeDimension(PlayerEvent.PlayerChangedDimensionEvent e) {
+        try {
         if (e.getEntity() instanceof ServerPlayer p) clear(p, true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onChangeDimension", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onRespawn(PlayerEvent.PlayerRespawnEvent e) {
+        try {
         if (e.getEntity() instanceof ServerPlayer p) clear(p, true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Downed.onRespawn", lbCrash);
+        }
     }
 
     /** Server stopping: forget everything (the crawl modifier is transient anyway). */

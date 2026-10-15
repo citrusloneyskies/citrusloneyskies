@@ -22,7 +22,11 @@ public record WeaponAnimPacket(int entity, int weapon, int style, int step, int 
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.lastbastion.client.render.weapon.WeaponAnimations.onPacket(this));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("WeaponAnimPacket.handle", lbCrash);
+        }
     }
 }

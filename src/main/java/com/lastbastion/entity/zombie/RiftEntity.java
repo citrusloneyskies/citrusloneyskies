@@ -92,6 +92,7 @@ public class RiftEntity extends Monster implements SiegeEnemy {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         setDeltaMovement(0, Math.min(0, getDeltaMovement().y), 0);
         if (level().isClientSide) {
@@ -126,6 +127,9 @@ public class RiftEntity extends Monster implements SiegeEnemy {
         }
         if (tickCount % 30 == 0) Vfx.vortex(sl, position(), 0x8A2AE0, 0x2A0A40, 1.4f, 3.2f, 30, this);
         if (tickCount % 80 == 0) sl.playSound(null, getX(), getY(), getZ(), SoundEvents.PORTAL_AMBIENT, SoundSource.HOSTILE, 0.8f, 0.6f);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("RiftEntity.tick", lbCrash);
+        }
     }
 
     private void burst(ServerLevel sl, SiegeData d) {

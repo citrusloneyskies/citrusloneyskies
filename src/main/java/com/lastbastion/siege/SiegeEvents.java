@@ -18,11 +18,16 @@ public final class SiegeEvents {
 
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent e) {
+        try {
         if (e.phase == TickEvent.Phase.END && e.level instanceof ServerLevel sl) SiegeManager.tick(sl);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onLevelTick", lbCrash);
+        }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onDeath(LivingDeathEvent e) {
+        try {
         if (e.isCanceled()) return;
         if (e.getEntity() instanceof SiegeEnemy && e.getEntity().level() instanceof ServerLevel sl
                 && e.getEntity().getPersistentData().contains("lb_plague")
@@ -37,11 +42,15 @@ public final class SiegeEvents {
         if (e.getEntity() instanceof SiegeEnemy && e.getEntity().level() instanceof ServerLevel sl) {
             SiegeManager.onEnemyKilled(sl, e.getEntity(), e.getSource().getEntity());
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onDeath", lbCrash);
+        }
     }
 
     /** Enemies and war-event entities that are destroyed (killed or discarded) stop counting at once. */
     @SubscribeEvent
     public static void onLeave(net.minecraftforge.event.entity.EntityLeaveLevelEvent e) {
+        try {
         if (!(e.getLevel() instanceof ServerLevel sl)) return;
         net.minecraft.world.entity.Entity.RemovalReason why = e.getEntity().getRemovalReason();
         if (why == null || !why.shouldDestroy()) return;
@@ -51,20 +60,28 @@ public final class SiegeEvents {
         changed |= d.raidEntities.remove(id);
         d.trackedSeen.remove(id);
         if (changed) d.setDirty();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onLeave", lbCrash);
+        }
     }
 
     /** The Titan Exosuit takes the hits for its pilot. */
     @SubscribeEvent
     public static void onHurt(LivingHurtEvent e) {
+        try {
         if (e.getEntity() instanceof Player p && p.getVehicle() instanceof TitanExoEntity exo) {
             e.setCanceled(true);
             exo.hurt(e.getSource(), e.getAmount());
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onHurt", lbCrash);
         }
     }
 
     /** No sleeping through the siege: nightfall is when the horde comes. */
     @SubscribeEvent
     public static void onSleep(net.minecraftforge.event.entity.player.PlayerSleepInBedEvent e) {
+        try {
         if (!(e.getEntity().level() instanceof ServerLevel sl)) return;
         net.minecraft.core.BlockPos core = SiegeManager.corePos(sl);
         if (core != null && core.closerToCenterThan(e.getEntity().position(), 256)) {
@@ -73,16 +90,27 @@ public final class SiegeEvents {
                     "You cannot rest while the Siege Core stands - the horde comes at nightfall.")
                     .withStyle(net.minecraft.ChatFormatting.RED), true);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onSleep", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent e) {
+        try {
         com.lastbastion.siege.raid.Downed.reset();
         com.lastbastion.entity.hero.Companions.reset();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onServerStopped", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
+        try {
         SiegeCommands.register(e.getDispatcher());
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeEvents.onCommands", lbCrash);
+        }
     }
 }

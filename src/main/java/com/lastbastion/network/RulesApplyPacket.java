@@ -20,8 +20,12 @@ public record RulesApplyPacket(CompoundTag rules, boolean reset) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         ServerPlayer p = ctx.get().getSender();
         ctx.get().setPacketHandled(true);
         if (p != null) SiegeManager.applyRules(p, rules == null ? new CompoundTag() : rules, reset);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("RulesApplyPacket.handle", lbCrash);
+        }
     }
 }

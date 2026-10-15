@@ -385,8 +385,12 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
 
     @Override
     public void aiStep() {
+        try {
         super.aiStep();
         if (level() instanceof ServerLevel sl && isAlive()) brain(sl);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HeroEntity.aiStep", lbCrash);
+        }
     }
 
     private void brain(ServerLevel level) {

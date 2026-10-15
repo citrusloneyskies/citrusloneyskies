@@ -53,11 +53,17 @@ public class TurretScreen extends Screen {
 
     @Override
     public void tick() {
+        try {
         if (!turret.isAlive()) onClose();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("TurretScreen.tick", lbCrash);
+        }
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         TurretKind k = turret.kind;
         int lvl = turret.turretLevel();
@@ -126,6 +132,10 @@ public class TurretScreen extends Screen {
         sell.setMessage(Component.literal("Sell +" + turret.sellValue()));
         mode.setMessage(Component.literal("Targeting: " + turret.mode().title));
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("TurretScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     private int stat(GuiGraphics g, int y, String name, String now, String next) {

@@ -88,6 +88,7 @@ public final class WeaponAnimations {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onClick(InputEvent.InteractionKeyMappingTriggered e) {
+        try {
         if (!e.isAttack()) return;
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer p = mc.player;
@@ -97,10 +98,14 @@ public final class WeaponAnimations {
         e.setCanceled(true);
         e.setSwingHand(false);
         trySwing(p, w.kind);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("WeaponAnimations.onClick", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.isPaused()) return;
@@ -111,6 +116,9 @@ public final class WeaponAnimations {
         if (!(p.getMainHandItem().getItem() instanceof MeleeWeaponItem w) || p.getVehicle() instanceof TitanExoEntity) return;
         if (mc.hitResult != null && mc.hitResult.getType() == HitResult.Type.BLOCK) return;
         if (p.getAttackStrengthScale(0f) >= 1f) trySwing(p, w.kind);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("WeaponAnimations.onClientTick", lbCrash);
+        }
     }
 
     static void trySwing(LocalPlayer p, WeaponKind k) {

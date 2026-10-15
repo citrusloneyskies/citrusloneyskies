@@ -68,6 +68,8 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
 
     @Override
     public void renderByItem(ItemStack stack, ItemDisplayContext ctx, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
         if (stack.getItem() instanceof GunItem g) {
             renderGun(stack, g, ctx, pose, buffers, light, overlay);
             return;
@@ -93,6 +95,10 @@ public final class WeaponRenderer extends BlockEntityWithoutLevelRenderer {
             b.root.render(pose, buffers.getBuffer(RenderType.eyes(b.texture.glow())), LightTexture.FULL_BRIGHT, overlay, pulse, pulse, pulse, 1f);
         }
         pose.popPose();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("WeaponRenderer.renderByItem", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
+        }
     }
 
     private void renderGun(ItemStack stack, GunItem g, ItemDisplayContext ctx, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {

@@ -70,6 +70,7 @@ public class SiegeArmorItem extends ArmorItem {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         int worn = 0;
         Player viewer = level != null && level.isClientSide ? clientPlayer() : null;
         if (viewer != null) worn = ArmorSets.piecesWorn(viewer, set);
@@ -78,6 +79,9 @@ public class SiegeArmorItem extends ArmorItem {
         tip.add(Component.literal("◆ Set bonus - " + set.bonus).withStyle(active ? ChatFormatting.GOLD : ChatFormatting.GRAY));
         tip.add(Component.literal("  " + set.bonusDesc).withStyle(active ? ChatFormatting.YELLOW : ChatFormatting.DARK_GRAY));
         tip.add(Component.literal(set.lore).withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeArmorItem.appendHoverText", lbCrash);
+        }
     }
 
     @Nullable

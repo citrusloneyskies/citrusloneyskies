@@ -784,6 +784,7 @@ public final class MeleeCombat {
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         State st = STATES.get(p.getUUID());
         if (st == null) return;
@@ -834,10 +835,14 @@ public final class MeleeCombat {
             st.phaseEcho = false;
             if (stack.getItem() instanceof MeleeWeaponItem w && w.kind == WeaponKind.VOIDEDGE) cooldown(p, stack, w.kind, w.kind.specialCooldown * 20);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeCombat.onPlayerTick", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END || !(e.level instanceof ServerLevel level) || PENDING.isEmpty()) return;
         long now = level.getGameTime();
         List<Pending> due = new ArrayList<>();
@@ -853,11 +858,15 @@ public final class MeleeCombat {
                 LastBastion.LOGGER.warn("Delayed weapon effect failed", ex);
             }
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeCombat.onLevelTick", lbCrash);
+        }
     }
 
     /** Riposte: blows that land inside the parry window are deflected and answered. */
     @SubscribeEvent
     public static void onAttacked(LivingAttackEvent e) {
+        try {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         State st = STATES.get(p.getUUID());
         if (st == null || level.getGameTime() > st.parryUntil) return;
@@ -890,21 +899,29 @@ public final class MeleeCombat {
             }
             Vfx.wave(level, p.position(), p.position().add(flatLook(p).scale(4)), 0xFFFFFF, 3f, 1.6f, 10);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeCombat.onAttacked", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onFall(LivingFallEvent e) {
+        try {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         State st = STATES.get(p.getUUID());
         if (st != null && p.level().getGameTime() < st.noFallUntil) {
             e.setDistance(0);
             e.setCanceled(true);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeCombat.onFall", lbCrash);
+        }
     }
 
     /** Kill passives: souls, Cold Blood, Beacon of Hope. */
     @SubscribeEvent
     public static void onKill(LivingDeathEvent e) {
+        try {
         if (!(e.getSource().getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         ItemStack stack = p.getMainHandItem();
         if (!(stack.getItem() instanceof MeleeWeaponItem w)) return;
@@ -933,10 +950,17 @@ public final class MeleeCombat {
             default -> {
             }
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeCombat.onKill", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent e) {
+        try {
         STATES.remove(e.getEntity().getUUID());
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MeleeCombat.onLogout", lbCrash);
+        }
     }
 }

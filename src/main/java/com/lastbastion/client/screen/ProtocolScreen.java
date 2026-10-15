@@ -54,11 +54,17 @@ public class ProtocolScreen extends Screen {
 
     @Override
     public void tick() {
+        try {
         updateButtons();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ProtocolScreen.tick", lbCrash);
+        }
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         g.fill(left, top, left + w, top + h, 0xE0101418);
         g.fill(left, top, left + w, top + 1, 0xFF6FE3FF);
@@ -84,6 +90,10 @@ public class ProtocolScreen extends Screen {
             for (int i = 0; i < Math.min(2, lines.size()); i++) g.drawString(font, lines.get(i), left + 14, y + 14 + i * 9, 0xB0B0B0, false);
         }
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ProtocolScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     @Override

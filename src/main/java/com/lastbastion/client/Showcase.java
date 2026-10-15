@@ -149,6 +149,7 @@ public final class Showcase {
 
     @SubscribeEvent
     public static void onTick(TickEvent.ClientTickEvent e) {
+        try {
         if (!ENABLED || e.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         ticks++;
@@ -218,6 +219,9 @@ public final class Showcase {
             }
             default -> {
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("Showcase.onTick", lbCrash);
         }
     }
 

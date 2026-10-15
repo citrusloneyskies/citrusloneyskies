@@ -39,11 +39,17 @@ public class HeroScreen extends Screen {
 
     @Override
     public void tick() {
+        try {
         if (!hero.isAlive()) onClose();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HeroScreen.tick", lbCrash);
+        }
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         g.fill(left, top, left + W, top + H, 0xE0101418);
         g.fill(left, top, left + W, top + 2, 0xFF000000 | hero.kind.color);
@@ -83,6 +89,10 @@ public class HeroScreen extends Screen {
             y += 10;
         }
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HeroScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     @Override

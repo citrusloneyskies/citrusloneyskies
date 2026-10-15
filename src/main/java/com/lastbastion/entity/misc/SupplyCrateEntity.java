@@ -77,6 +77,7 @@ public class SupplyCrateEntity extends Entity {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         if (!landed()) {
             Vec3 v = getDeltaMovement();
@@ -107,6 +108,9 @@ public class SupplyCrateEntity extends Entity {
             sl.playSound(null, getX(), getY(), getZ(), SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.NEUTRAL, 1.2f, life <= 60 ? 2f : 1.4f);
         }
         if (life <= 0) scuttle(sl);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SupplyCrateEntity.tick", lbCrash);
+        }
     }
 
     private void land() {

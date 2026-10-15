@@ -479,6 +479,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
 
     @Override
     public void aiStep() {
+        try {
         super.aiStep();
         if (level() instanceof ServerLevel sl) {
             if (isWarlord() && isAlive()) warlordTick(sl);
@@ -489,6 +490,9 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
                 level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, below), getX() + (random.nextDouble() - 0.5) * getBbWidth(),
                         getY() + 0.1, getZ() + (random.nextDouble() - 0.5) * getBbWidth(), 0, 0.1, 0);
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeZombie.aiStep", lbCrash);
         }
     }
 

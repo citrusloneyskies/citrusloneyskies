@@ -52,14 +52,14 @@ public final class Anim {
     public static float kf(float t, float... tv) {
         if (tv.length < 2) return 0;
         if (t <= tv[0]) return tv[1];
-        for (int i = 2; i < tv.length; i += 2) {
+        for (int i = 2; i + 1 < tv.length; i += 2) {
             if (t <= tv[i]) {
                 float t0 = tv[i - 2], t1 = tv[i];
                 float x = t1 - t0 <= 1e-4f ? 1 : (t - t0) / (t1 - t0);
                 return Mth.lerp(smooth(x), tv[i - 1], tv[i + 1]);
             }
         }
-        return tv[tv.length - 1];
+        return tv[(tv.length & ~1) - 1];
     }
 
     /** Keyframe track with values given in degrees; returns radians. */

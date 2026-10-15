@@ -245,6 +245,7 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void onUseTick(Level level, LivingEntity user, ItemStack stack, int remaining) {
+        try {
         int used = getUseDuration(stack) - remaining;
         if (kind == GunKind.STARPIERCER) {
             if (!(level instanceof ServerLevel sl)) return;
@@ -301,10 +302,14 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
             }
             if (used % 8 == 0) sl.playSound(null, user.blockPosition(), SoundEvents.BLAZE_BURN, SoundSource.PLAYERS, 0.6f, 0.8f);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("GunItem.onUseTick", lbCrash);
+        }
     }
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity user, int remaining) {
+        try {
         if (kind != GunKind.STARPIERCER) return;
         int used = getUseDuration(stack) - remaining;
         boolean over = user.isShiftKeyDown() && used >= chargeNeeded(true);
@@ -343,6 +348,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         sl.playSound(null, user.blockPosition(), SoundEvents.WARDEN_SONIC_BOOM, SoundSource.PLAYERS, 1f, over ? 1.1f : 1.6f);
         if (user instanceof Player p) p.getCooldowns().addCooldown(this, over ? 160 : kind.cooldown);
         user.push(-dir.x * (over ? 0.8 : 0.4), 0.1, -dir.z * (over ? 0.8 : 0.4));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("GunItem.releaseUsing", lbCrash);
+        }
     }
 
     // ------------------------------------------------------------------ firing
@@ -560,6 +568,7 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
+        try {
         if (level.isClientSide) return;
         CompoundTag tag = stack.getTag();
         if (kind.usesHeat()) {
@@ -578,6 +587,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
             setAmmo(stack, magSize(stack));
             level.playSound(null, entity.blockPosition(), kind == GunKind.THUNDERBOOM ? SoundEvents.CROSSBOW_LOADING_END : SoundEvents.ARMOR_EQUIP_IRON,
                     SoundSource.PLAYERS, 0.8f, 1.2f);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("GunItem.inventoryTick", lbCrash);
         }
     }
 
@@ -619,6 +631,7 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         tip.add(Component.literal(kind.desc).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal(String.format("Damage %.1f   Mk %s", dmg(stack), Arsenal.roman(Arsenal.mk(stack)))).withStyle(ChatFormatting.DARK_AQUA));
         if (kind.mag > 0) {
@@ -629,6 +642,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         tip.add(Component.literal("  " + kind.altDesc).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal("Mk III: larger magazine.  Mk V: faster reload.").withStyle(ChatFormatting.DARK_GRAY));
         if (kind.mag > 0) tip.add(Component.literal("Reload: R (rebindable)").withStyle(ChatFormatting.DARK_GRAY));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("GunItem.appendHoverText", lbCrash);
+        }
     }
 
     // ------------------------------------------------------------------ client

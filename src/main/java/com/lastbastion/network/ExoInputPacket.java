@@ -19,12 +19,16 @@ public record ExoInputPacket(boolean fire, boolean missiles, boolean boost) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         ServerPlayer p = ctx.get().getSender();
         ctx.get().setPacketHandled(true);
         if (p != null && p.getVehicle() instanceof TitanExoEntity exo) {
             exo.fireInput = fire;
             exo.missileInput = missiles;
             exo.boostInput = boost;
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ExoInputPacket.handle", lbCrash);
         }
     }
 }

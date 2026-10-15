@@ -57,6 +57,7 @@ public class SentryDroneEntity extends Mob implements SiegeAlly {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         if (level().isClientSide) {
             if (random.nextInt(3) == 0) level().addParticle(ParticleTypes.ELECTRIC_SPARK, getX(), getY() - 0.1, getZ(), 0, -0.05, 0);
@@ -95,6 +96,9 @@ public class SentryDroneEntity extends Mob implements SiegeAlly {
                 Hitscan.fire(sl, this, position(), to.subtract(position()).normalize(), 20, 4f, Element.ARCANE, Fx.dust(0x7FE8FF, 0.6f));
                 sl.playSound(null, blockPosition(), SoundEvents.BEACON_DEACTIVATE, net.minecraft.sounds.SoundSource.NEUTRAL, 0.3f, 2f);
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SentryDroneEntity.tick", lbCrash);
         }
     }
 

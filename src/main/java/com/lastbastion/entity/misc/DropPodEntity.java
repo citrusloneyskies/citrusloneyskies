@@ -50,6 +50,7 @@ public class DropPodEntity extends Entity {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         if (!onGround()) {
             setDeltaMovement(0, Math.max(-2.2, getDeltaMovement().y - 0.12), 0);
@@ -86,6 +87,9 @@ public class DropPodEntity extends Entity {
             sl.sendParticles(ParticleTypes.CLOUD, getX(), getY() + 1, getZ(), 40, 1, 1, 1, 0.1);
             Fx.sound(sl, position(), SoundEvents.PISTON_EXTEND, 2f, 0.5f);
             discard();
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("DropPodEntity.tick", lbCrash);
         }
     }
 

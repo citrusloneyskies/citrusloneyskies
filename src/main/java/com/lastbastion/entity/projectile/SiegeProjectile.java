@@ -141,6 +141,7 @@ public class SiegeProjectile extends Projectile {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         Vec3 motion = getDeltaMovement();
         if (!level().isClientSide) {
@@ -179,6 +180,9 @@ public class SiegeProjectile extends Projectile {
         setPos(end.x, end.y, end.z);
         updateRotation();
         if (level().isClientSide) trail(from, end);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeProjectile.tick", lbCrash);
+        }
     }
 
     private void trail(Vec3 from, Vec3 to) {

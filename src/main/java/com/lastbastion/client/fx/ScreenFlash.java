@@ -32,10 +32,16 @@ public final class ScreenFlash implements IGuiOverlay {
 
     @Override
     public void render(ForgeGui gui, GuiGraphics g, float pt, int w, int h) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         if (age >= life || strength <= 0) return;
         float t = (age + pt) / life;
         float a = strength * (1 - t) * (1 - t);
         if (a <= 0.01f) return;
         g.fill(0, 0, w, h, ((int) (a * 255) << 24) | (color & 0xFFFFFF));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ScreenFlash.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 }

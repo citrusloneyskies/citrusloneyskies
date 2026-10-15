@@ -27,6 +27,8 @@ public class CoreCrystalRenderer implements BlockEntityRenderer<SiegeCoreBlockEn
 
     @Override
     public void render(SiegeCoreBlockEntity be, float pt, PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
         ModelSpec.Baked b = CoreModel.baked();
         float t = be.ticks + pt;
         float hp = ClientSiegeState.active() ? ClientSiegeState.coreFraction() : 1f;
@@ -93,6 +95,10 @@ public class CoreCrystalRenderer implements BlockEntityRenderer<SiegeCoreBlockEn
             b.root.render(pose, buffers.getBuffer(RenderType.eyes(b.texture.glow())), LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, r, g, bl, 1f);
         }
         pose.popPose();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("CoreCrystalRenderer.render", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
+        }
     }
 
     private static int lvl(int[] up, CoreUpgrade u) {

@@ -176,6 +176,7 @@ public class TitanExoEntity extends Mob implements SiegeAlly {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         if (level().isClientSide) return;
         ServerLevel sl = (ServerLevel) level();
@@ -230,6 +231,9 @@ public class TitanExoEntity extends Mob implements SiegeAlly {
         }
         if (getDeltaMovement().horizontalDistanceSqr() > 0.003 && onGround() && tickCount % 9 == 0) {
             sl.playSound(null, blockPosition(), SoundEvents.IRON_GOLEM_STEP, net.minecraft.sounds.SoundSource.NEUTRAL, 1.2f, 0.6f);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("TitanExoEntity.tick", lbCrash);
         }
     }
 

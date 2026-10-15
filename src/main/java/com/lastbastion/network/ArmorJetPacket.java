@@ -18,8 +18,12 @@ public record ArmorJetPacket(int unused) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         ServerPlayer p = ctx.get().getSender();
         ctx.get().setPacketHandled(true);
         if (p != null) ArmorSets.jumpJet(p);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorJetPacket.handle", lbCrash);
+        }
     }
 }

@@ -41,7 +41,11 @@ public record OpenScreenPacket(int type, int entityId, BlockPos pos, int[] falle
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientScreens.open(this));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("OpenScreenPacket.handle", lbCrash);
+        }
     }
 }

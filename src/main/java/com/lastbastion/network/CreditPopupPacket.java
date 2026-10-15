@@ -23,7 +23,11 @@ public record CreditPopupPacket(Vec3 pos, int amount) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientSiegeState.popup(pos, amount));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("CreditPopupPacket.handle", lbCrash);
+        }
     }
 }

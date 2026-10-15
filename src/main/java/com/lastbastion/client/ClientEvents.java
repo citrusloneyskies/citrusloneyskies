@@ -33,6 +33,7 @@ public final class ClientEvents {
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
@@ -60,29 +61,42 @@ public final class ClientEvents {
         } else if (lastFire || lastMissile || lastBoost) {
             lastFire = lastMissile = lastBoost = false;
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onClientTick", lbCrash);
+        }
     }
 
     /** While piloting the exosuit, attack/use drive the weapons instead of punching; while downed, nothing works. */
     @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
     public static void onInteract(InputEvent.InteractionKeyMappingTriggered e) {
+        try {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null && (mc.player.getVehicle() instanceof TitanExoEntity || ClientDowned.isDowned(mc.player))) {
             e.setCanceled(true);
             e.setSwingHand(false);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onInteract", lbCrash);
         }
     }
 
     /** Downed players crawl: no jumping, no sneaking. */
     @SubscribeEvent
     public static void onMovementInput(net.minecraftforge.client.event.MovementInputUpdateEvent e) {
+        try {
         if (ClientDowned.isDowned(e.getEntity())) {
             e.getInput().jumping = false;
             e.getInput().shiftKeyDown = false;
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onMovementInput", lbCrash);
         }
     }
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent e) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(e.getPoseStack());
+        try {
         if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         com.lastbastion.client.fx.VfxManager.render(e);
         renderSpeech(e);
@@ -110,6 +124,10 @@ public final class ClientEvents {
             pose.popPose();
         }
         buf.endBatch();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onRenderLevel", lbCrash);
+            com.lastbastion.util.Safe.restore(e.getPoseStack(), lbCrashDepth);
+        }
     }
 
     /** "DOWNED" labels with the bleed-out timer and revive progress over downed teammates. */
@@ -185,23 +203,32 @@ public final class ClientEvents {
 
     @SubscribeEvent
     public static void onCameraAngles(ViewportEvent.ComputeCameraAngles e) {
+        try {
         float[] o = com.lastbastion.client.fx.CameraShake.offsets((float) e.getPartialTick());
         if (o == null) return;
         e.setYaw(e.getYaw() + o[0]);
         e.setPitch(e.getPitch() + o[1]);
         e.setRoll(e.getRoll() + o[2]);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onCameraAngles", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onFog(ViewportEvent.RenderFog e) {
+        try {
         if (ClientSiegeState.state() != SiegeState.WAVE || ClientSiegeState.modifier() != NightModifier.FOG) return;
         e.setNearPlaneDistance(2f);
         e.setFarPlaneDistance(Math.min(e.getFarPlaneDistance(), 36f));
         e.setCanceled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onFog", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onFogColor(ViewportEvent.ComputeFogColor e) {
+        try {
         if (ClientSiegeState.state() != SiegeState.WAVE) return;
         NightModifier m = ClientSiegeState.modifier();
         if (m == NightModifier.BLOOD_MOON) {
@@ -216,6 +243,9 @@ public final class ClientEvents {
             e.setRed(e.getRed() * 0.7f + 0.1f);
             e.setGreen(e.getGreen() * 0.5f);
             e.setBlue(e.getBlue() * 0.8f + 0.15f);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ClientEvents.onFogColor", lbCrash);
         }
     }
 }

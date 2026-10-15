@@ -23,6 +23,7 @@ public final class ArmorInput {
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer p = mc.player;
@@ -35,5 +36,8 @@ public final class ArmorInput {
             Net.toServer(new ArmorJetPacket(0));
         }
         wasDown = down;
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorInput.onClientTick", lbCrash);
+        }
     }
 }

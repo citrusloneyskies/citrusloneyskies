@@ -21,7 +21,11 @@ public record SpeechPacket(int entityId, String text, int color) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientSiegeState.speech(entityId, text, color));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SpeechPacket.handle", lbCrash);
+        }
     }
 }

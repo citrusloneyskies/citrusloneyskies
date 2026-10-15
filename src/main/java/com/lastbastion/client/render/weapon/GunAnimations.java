@@ -51,6 +51,7 @@ public final class GunAnimations {
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
         ticks++;
@@ -60,6 +61,9 @@ public final class GunAnimations {
             if (mc.player != null && mc.screen == null && mc.player.getMainHandItem().getItem() instanceof GunItem g && g.kind.mag > 0) {
                 Net.toServer(new GunReloadPacket(0));
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("GunAnimations.onClientTick", lbCrash);
         }
     }
 

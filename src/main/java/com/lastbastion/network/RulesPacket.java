@@ -22,7 +22,11 @@ public record RulesPacket(CompoundTag rules, boolean canEdit, boolean open) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientScreens.rules(this));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("RulesPacket.handle", lbCrash);
+        }
     }
 }

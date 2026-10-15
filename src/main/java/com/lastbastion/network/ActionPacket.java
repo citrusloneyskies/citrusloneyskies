@@ -46,6 +46,7 @@ public record ActionPacket(int action, int target, String id) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         ServerPlayer p = ctx.get().getSender();
         ctx.get().setPacketHandled(true);
         if (p == null) return;
@@ -128,6 +129,9 @@ public record ActionPacket(int action, int target, String id) {
             }
             default -> {
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ActionPacket.handle", lbCrash);
         }
     }
 

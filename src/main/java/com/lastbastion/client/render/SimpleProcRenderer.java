@@ -36,6 +36,8 @@ public class SimpleProcRenderer<T extends Entity> extends EntityRenderer<T> {
 
     @Override
     public void render(T entity, float yaw, float pt, PoseStack pose, MultiBufferSource buffers, int light) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
         pose.pushPose();
         transform.apply(entity, pose, pt);
         pose.scale(-1, -1, 1);
@@ -48,6 +50,10 @@ public class SimpleProcRenderer<T extends Entity> extends EntityRenderer<T> {
         }
         pose.popPose();
         super.render(entity, yaw, pt, pose, buffers, light);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SimpleProcRenderer.render", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
+        }
     }
 
     @Override

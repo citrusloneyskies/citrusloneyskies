@@ -420,12 +420,16 @@ public class BeelzebubDevil extends DevilEntity {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         if (level().isClientSide && !dissolved() && random.nextInt(2) == 0) {
             double a = random.nextDouble() * Math.PI * 2, r = 0.8 + random.nextDouble() * 1.4;
             level().addParticle(FxParticleOptions.of(FxStyle.DEBRIS, FLY, 0.06f, 12), getX() + Math.cos(a) * r,
                     getY() + 0.8 + random.nextDouble() * getBbHeight(), getZ() + Math.sin(a) * r,
                     (random.nextDouble() - 0.5) * 0.2, (random.nextDouble() - 0.5) * 0.1, (random.nextDouble() - 0.5) * 0.2);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("BeelzebubDevil.tick", lbCrash);
         }
     }
 

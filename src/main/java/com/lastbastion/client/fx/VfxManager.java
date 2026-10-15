@@ -57,10 +57,14 @@ public final class VfxManager {
     }
 
     public static void tick() {
+        try {
         clientTicks++;
         CameraShake.tick();
         ScreenFlash.tick();
         ACTIVE.removeIf(e -> ++e.age > e.p.life());
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("VfxManager.tick", lbCrash);
+        }
     }
 
     public static void clear() {
@@ -70,6 +74,8 @@ public final class VfxManager {
     // ------------------------------------------------------------------ rendering
 
     public static void render(RenderLevelStageEvent e) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(e.getPoseStack());
+        try {
         boolean dome = coreDomeVisible();
         if (ACTIVE.isEmpty() && !dome) return;
         Minecraft mc = Minecraft.getInstance();
@@ -106,6 +112,10 @@ public final class VfxManager {
         for (Effect fx : ACTIVE) if (!dark(fx)) shape(d, fx, pt);
         if (dome) coreDome(d, pt);
         buf.endBatch(VfxRenderTypes.ADDITIVE);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("VfxManager.render", lbCrash);
+            com.lastbastion.util.Safe.restore(e.getPoseStack(), lbCrashDepth);
+        }
     }
 
     /** Effects flagged with {@code Vfx.DARK} render alpha-blended (dark colours stay dark). */

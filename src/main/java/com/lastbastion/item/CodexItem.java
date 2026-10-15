@@ -30,7 +30,11 @@ public class CodexItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         tip.add(Component.literal("Everything about the siege, with 3D models of every foe and ally.").withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal("Right-click to read.").withStyle(ChatFormatting.DARK_GRAY));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("CodexItem.appendHoverText", lbCrash);
+        }
     }
 }

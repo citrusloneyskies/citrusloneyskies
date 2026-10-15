@@ -80,10 +80,14 @@ public class TurretKitItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         tip.add(Component.literal(kind.desc).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal("Damage " + kind.damage + "  Range " + kind.range + "  Element " + kind.element.name()).withStyle(ChatFormatting.DARK_AQUA));
         tip.add(Component.literal("Lv3: " + kind.perk3).withStyle(ChatFormatting.GOLD));
         tip.add(Component.literal("Lv5: " + kind.perk5).withStyle(ChatFormatting.LIGHT_PURPLE));
         tip.add(Component.literal("Right-click a block near the core to deploy.").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("TurretKitItem.appendHoverText", lbCrash);
+        }
     }
 }

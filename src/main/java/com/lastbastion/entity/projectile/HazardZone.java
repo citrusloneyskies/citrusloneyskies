@@ -109,6 +109,7 @@ public class HazardZone extends Entity {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         age++;
         if (level().isClientSide) {
@@ -230,6 +231,9 @@ public class HazardZone extends Entity {
             }
             default -> {
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HazardZone.tick", lbCrash);
         }
     }
 

@@ -126,13 +126,19 @@ public class CodexScreen extends Screen {
 
     @Override
     public void tick() {
+        try {
         ticks++;
         if (!dragging) yaw += 0.8f;
         for (Entity e : models.values()) e.tickCount++;
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("CodexScreen.tick", lbCrash);
+        }
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         g.fill(left, top, left + w, top + h, 0xEE0D1015);
         g.fill(left, top, left + w, top + 1, 0xFF000000 | tab.color);
@@ -154,6 +160,10 @@ public class CodexScreen extends Screen {
         Entry e = current();
         if (e != null) renderEntry(g, e, mx, my, pt);
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("CodexScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     private void renderList(GuiGraphics g, int mx, int my) {

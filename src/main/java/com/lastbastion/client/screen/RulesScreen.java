@@ -90,6 +90,8 @@ public class RulesScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         renderBackground(g);
         g.fill(left, top, left + w, top + h, 0xE40E1116);
         g.fill(left, top, left + w, top + 1, 0xFFFFB000);
@@ -157,6 +159,10 @@ public class RulesScreen extends Screen {
         apply.active = canEdit && dirty();
         reset.active = canEdit;
         super.render(g, mx, my, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("RulesScreen.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     private void drawBtn(GuiGraphics g, int x, int y, int bw, String label, int mx, int my) {

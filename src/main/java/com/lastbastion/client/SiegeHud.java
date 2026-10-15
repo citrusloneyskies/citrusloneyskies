@@ -28,6 +28,8 @@ public final class SiegeHud implements IGuiOverlay {
 
     @Override
     public void render(ForgeGui gui, GuiGraphics g, float pt, int w, int h) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(g.pose());
+        try {
         Minecraft mc = Minecraft.getInstance();
         if (mc.options.hideGui || mc.player == null) return;
         ClientDowned.State down = ClientDowned.self();
@@ -96,6 +98,10 @@ public final class SiegeHud implements IGuiOverlay {
         y += 16;
         if (!wave) y = intel(g, f, hud.intel(), x, y, pw);
         else objectives(g, mc, f, hud.objectives(), x, y, pw, pt);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeHud.render", lbCrash);
+            com.lastbastion.util.Safe.restore(g.pose(), lbCrashDepth);
+        }
     }
 
     private static void panel(GuiGraphics g, int x, int y, int w, int h, int accent) {

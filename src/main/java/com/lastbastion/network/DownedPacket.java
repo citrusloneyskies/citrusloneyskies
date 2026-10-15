@@ -23,7 +23,11 @@ public record DownedPacket(int entity, boolean downed, int bleed, int maxBleed, 
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientDowned.update(this));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("DownedPacket.handle", lbCrash);
+        }
     }
 }

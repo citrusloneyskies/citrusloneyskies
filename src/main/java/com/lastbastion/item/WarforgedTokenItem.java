@@ -28,8 +28,12 @@ public class WarforgedTokenItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        try {
         tip.add(Component.literal("Hammered from the arms of fallen warlords.").withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
         tip.add(Component.literal("At the Siege Core (Arsenal tab): upgrade the weapon in your hand by one Mk, free.").withStyle(ChatFormatting.GOLD));
         tip.add(Component.literal("Dropped by Warlords and bosses; awarded every 10 waves.").withStyle(ChatFormatting.DARK_GRAY));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("WarforgedTokenItem.appendHoverText", lbCrash);
+        }
     }
 }

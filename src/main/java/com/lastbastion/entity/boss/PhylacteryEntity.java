@@ -37,12 +37,16 @@ public class PhylacteryEntity extends Mob implements SiegeEnemy, Enemy {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         setDeltaMovement(0, Math.sin(tickCount * 0.1) * 0.02, 0);
         if (level() instanceof ServerLevel sl && tickCount % 5 == 0) {
             sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, getX(), getY() + 0.6, getZ(), 2, 0.3, 0.4, 0.3, 0.01);
         }
         if (!level().isClientSide && tickCount > 20 * 120) discard();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("PhylacteryEntity.tick", lbCrash);
+        }
     }
 
     @Override

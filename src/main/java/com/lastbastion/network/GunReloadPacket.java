@@ -18,8 +18,12 @@ public record GunReloadPacket(int unused) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         ServerPlayer p = ctx.get().getSender();
         ctx.get().setPacketHandled(true);
         if (p != null && p.getMainHandItem().getItem() instanceof GunItem g) g.startReload(p.level(), p, p.getMainHandItem());
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("GunReloadPacket.handle", lbCrash);
+        }
     }
 }

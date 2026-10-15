@@ -415,6 +415,7 @@ public class TurretEntity extends Mob implements SiegeAlly {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         setDeltaMovement(0, getDeltaMovement().y, 0);
         if (level().isClientSide) {
@@ -488,6 +489,9 @@ public class TurretEntity extends Mob implements SiegeAlly {
         if (cooldown <= 0) {
             cooldown = fireInterval();
             fire(sl, target);
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("TurretEntity.tick", lbCrash);
         }
     }
 

@@ -69,7 +69,13 @@ public class ProcModel<T extends Entity> extends EntityModel<T> {
 
     @Override
     public void renderToBuffer(PoseStack pose, VertexConsumer vc, int light, int overlay, float r, float g, float b, float a) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
         baked.root.render(pose, vc, light, overlay, Math.min(1f, r * tintR), Math.min(1f, g * tintG), Math.min(1f, b * tintB), Math.min(1f, a * alpha));
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ProcModel.renderToBuffer", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
+        }
     }
 
     /** Render with explicit colour (used by glow layers and block entity renderers). */

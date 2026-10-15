@@ -325,8 +325,12 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
 
     @Override
     public void aiStep() {
+        try {
         super.aiStep();
         if (level() instanceof ServerLevel sl && isAlive() && !isNoAi()) serverTick(sl);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("SiegeBoss.aiStep", lbCrash);
+        }
     }
 
     protected void serverTick(ServerLevel level) {

@@ -156,6 +156,7 @@ public class FxParticle extends TextureSheetParticle {
 
     @Override
     public void render(VertexConsumer vc, Camera camera, float pt) {
+        try {
         if (style != FxStyle.SPARK) {
             super.render(vc, camera, pt);
             return;
@@ -188,6 +189,9 @@ public class FxParticle extends TextureSheetParticle {
         vc.vertex(tail.x + side.x, tail.y + side.y, tail.z + side.z).uv(u1, v0).color(rCol, gCol, bCol, alpha).uv2(light).endVertex();
         vc.vertex(head.x + side.x, head.y + side.y, head.z + side.z).uv(u0, v0).color(rCol, gCol, bCol, alpha).uv2(light).endVertex();
         vc.vertex(head.x - side.x, head.y - side.y, head.z - side.z).uv(u0, v1).color(rCol, gCol, bCol, alpha).uv2(light).endVertex();
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("FxParticle.render", lbCrash);
+        }
     }
 
     public static final class Provider implements ParticleProvider<FxParticleOptions> {

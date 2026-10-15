@@ -18,8 +18,12 @@ public record WeaponSwingPacket(int unused) {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         ServerPlayer p = ctx.get().getSender();
         ctx.get().setPacketHandled(true);
         if (p != null) MeleeCombat.swing(p.serverLevel(), p, false);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("WeaponSwingPacket.handle", lbCrash);
+        }
     }
 }

@@ -89,6 +89,7 @@ public final class ArmorSets {
     /** Shadowstalker: slip out of attacks. */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onAttacked(LivingAttackEvent e) {
+        try {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         if (!wearing(p, ArmorSet.SHADOWSTALKER) || e.getSource().getEntity() == null || level.random.nextFloat() >= 0.2f) return;
         e.setCanceled(true);
@@ -97,11 +98,15 @@ public final class ArmorSets {
         Vfx.flash(level, at, 0x8A6AD0, 0.6f, 4);
         level.playSound(null, p.blockPosition(), SoundEvents.PHANTOM_FLAP, SoundSource.PLAYERS, 0.6f, 1.6f);
         p.invulnerableTime = 10;
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorSets.onAttacked", lbCrash);
+        }
     }
 
     /** Vanguard: damage reduction and the emergency barrier. */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onHurt(LivingHurtEvent e) {
+        try {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         if (!wearing(p, ArmorSet.VANGUARD)) return;
         e.setAmount(e.getAmount() * 0.85f);
@@ -115,11 +120,15 @@ public final class ArmorSets {
             level.playSound(null, p.blockPosition(), SoundEvents.ANVIL_LAND, SoundSource.PLAYERS, 0.8f, 1.3f);
             level.playSound(null, p.blockPosition(), SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1f, 1.5f);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorSets.onHurt", lbCrash);
+        }
     }
 
     /** Titan: no fall damage; long falls end in a shockwave slam. */
     @SubscribeEvent
     public static void onFall(LivingFallEvent e) {
+        try {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level) || !wearing(p, ArmorSet.TITAN)) return;
         float dist = e.getDistance();
         e.setDistance(0);
@@ -134,21 +143,29 @@ public final class ArmorSets {
             }
             level.playSound(null, p.blockPosition(), SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 0.8f, 1.2f);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorSets.onFall", lbCrash);
+        }
     }
 
     /** Sunforged kill heals. */
     @SubscribeEvent
     public static void onKill(LivingDeathEvent e) {
+        try {
         if (!(e.getSource().getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         if (!(e.getEntity() instanceof SiegeEnemy) || !wearing(p, ArmorSet.SUNFORGED)) return;
         for (LivingEntity a : SiegeDamage.defendersAround(level, p.position(), 6)) {
             a.heal(2f);
             Vfx.spray(level, FxStyle.STAR, a.position().add(0, 1.2, 0), 0xFFFFFF, 0xFFE070, 0.15f, 3, 0.08f, 1f);
         }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorSets.onKill", lbCrash);
+        }
     }
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
+        try {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         ArmorSet set = fullSet(p);
         if (set == null) return;
@@ -190,6 +207,9 @@ public final class ArmorSets {
             }
             default -> {
             }
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorSets.onPlayerTick", lbCrash);
         }
     }
 

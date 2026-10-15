@@ -54,7 +54,11 @@ public record HudSyncPacket(int state, int wave, float coreHp, float coreMax, fl
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
+        try {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientSiegeState.update(this));
         ctx.get().setPacketHandled(true);
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("HudSyncPacket.handle", lbCrash);
+        }
     }
 }

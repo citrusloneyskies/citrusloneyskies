@@ -40,12 +40,18 @@ public final class ArmorClientExt implements IClientItemExtensions {
 
         @Override
         public void renderToBuffer(PoseStack pose, VertexConsumer vc, int light, int overlay, float r, float g, float b, float a) {
+        int lbCrashDepth = com.lastbastion.util.Safe.depth(pose);
+        try {
             super.renderToBuffer(pose, vc, light, overlay, r, g, b, a);
             if (glow != null) {
                 VertexConsumer gv = Minecraft.getInstance().renderBuffers().bufferSource().getBuffer(RenderType.eyes(glow));
                 super.renderToBuffer(pose, gv, LightTexture.FULL_BRIGHT, overlay, 1f, 1f, 1f, a);
             }
+                } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("ArmorClientExt.renderToBuffer", lbCrash);
+            com.lastbastion.util.Safe.restore(pose, lbCrashDepth);
         }
+    }
     }
 
     public static Worn model(ArmorSet set, int slot) {

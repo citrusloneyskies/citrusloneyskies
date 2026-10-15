@@ -59,11 +59,15 @@ public class MorvathraxBoss extends SiegeBoss {
 
     @Override
     public void tick() {
+        try {
         super.tick();
         if (level().isClientSide) {
             clientAirO = clientAir;
             float want = airborne() && !onGround() ? 1 : 0;
             clientAir += (want - clientAir) * 0.12f;
+        }
+            } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
+            com.lastbastion.util.Safe.report("MorvathraxBoss.tick", lbCrash);
         }
     }
 
