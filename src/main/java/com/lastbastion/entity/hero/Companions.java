@@ -152,6 +152,14 @@ public final class Companions {
         } else {
             SiegeData d = SiegeManager.data(level);
             d.fallenHeroes.add(new SiegeData.FallenHero(owner, h.kind.ordinal(), h.heroLevel(), h.xp(), total));
+            // the mailbox keeps at most 30 sigils per player (oldest dropped) so a save can't bloat forever
+            long mine = d.fallenHeroes.stream().filter(f -> f.owner().equals(owner)).count();
+            for (java.util.Iterator<SiegeData.FallenHero> it = d.fallenHeroes.iterator(); it.hasNext() && mine > 30; ) {
+                if (it.next().owner().equals(owner)) {
+                    it.remove();
+                    mine--;
+                }
+            }
             d.setDirty();
         }
     }

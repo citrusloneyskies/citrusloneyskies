@@ -117,7 +117,8 @@ public final class WavePlanner {
         int idx = wave / Math.max(1, r.i(SiegeRules.BOSS_EVERY)) - 1;
         int count = wave <= 30 ? 1 : Math.min(3, 1 + (wave - 30) / 15);
         count = Math.min(count, enabled.size());
-        for (int i = 0; i < count; i++) out.add(enabled.get(Math.floorMod(idx + i * 2, enabled.size())));
+        // consecutive bosses: never the same one twice in a wave (a stride of 2 repeats when only two are enabled)
+        for (int i = 0; i < count; i++) out.add(enabled.get(Math.floorMod(idx + i, enabled.size())));
         return out;
     }
 

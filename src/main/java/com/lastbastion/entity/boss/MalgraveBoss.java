@@ -323,7 +323,7 @@ public class MalgraveBoss extends SiegeBoss {
                         if (d > 3.5 && d < 10) {
                             Vec3 to = v.position().add(position().subtract(v.position()).normalize().scale(2));
                             Vfx.dash(level, position().add(0, 1.2, 0), to.add(0, 1.2, 0), SHADOW, 1.2f, 10);
-                            teleportTo(to.x, v.getY(), to.z);
+                            if (level.noCollision(this, getBoundingBox().move(to.x - getX(), v.getY() - getY(), to.z - getZ()))) teleportTo(to.x, v.getY(), to.z);
                         }
                     }
                     Fx.sound(level, position(), SoundEvents.PLAYER_ATTACK_KNOCKBACK, 1.6f, 0.5f);
@@ -353,6 +353,7 @@ public class MalgraveBoss extends SiegeBoss {
                     LivingEntity v = foe != null && foe.isAlive() && distanceTo(foe) < 20 ? foe : target;
                     leapFrom = position();
                     leapTo = v != null ? v.position() : forward(8);
+                    if (!level.isLoaded(net.minecraft.core.BlockPos.containing(leapTo))) leapTo = position();
                     face(leapTo);
                     teleCircle(level, leapTo, 3.6f, 26);
                     say(random.nextBoolean() ? "JUDGEMENT!" : "Your sentence is death!");
@@ -365,6 +366,11 @@ public class MalgraveBoss extends SiegeBoss {
                     if (t % 2 == 0) Vfx.spray(level, FxStyle.FLAME, p.add(0, 1, 0), SOULFIRE, 0x1A60FF, 0.35f, 4, 0.06f, 0);
                 }
                 if (t == 26) {
+                    // never end the leap entombed in a wall or the floor
+                    if (!level.noCollision(this)) {
+                        Vec3 safe = com.lastbastion.entity.hero.Companions.safeSpotNear(level, this, position());
+                        setPos(safe.x, safe.y, safe.z);
+                    }
                     Vfx.ring(level, position().add(0, 0.1, 0), SOULFIRE, 4.5f, 14, 1.6f);
                     Vfx.pillar(level, position(), SOULFIRE, 1.4f, 7, 14);
                     Vfx.spray(level, FxStyle.DEBRIS, position(), 0x3A3A3A, 0x2A2A2A, 0.4f, 24, 0.5f, 0.8f);

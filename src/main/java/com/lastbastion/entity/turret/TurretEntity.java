@@ -401,6 +401,7 @@ public class TurretEntity extends Mob implements SiegeAlly {
     }
 
     public void sell(ServerPlayer by) {
+        if (!isAlive() || isRemoved()) return; // a second click in the same tick must not pay twice
         ServerLevel sl = (ServerLevel) level();
         SiegeData d = SiegeManager.data(sl);
         d.addCredits(by.getUUID(), sellValue());

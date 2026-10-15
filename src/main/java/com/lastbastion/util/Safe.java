@@ -25,7 +25,9 @@ public final class Safe {
 
     /** Log a suppressed error; repeats from the same place are silenced so a broken frame can't flood the log. */
     public static void report(String where, Throwable t) {
-        if (REPORTED.add(where + "|" + t.getClass().getName())) {
+        StackTraceElement[] st = t.getStackTrace();
+        String at = st.length > 0 ? st[0].toString() : "";
+        if (REPORTED.size() < 500 && REPORTED.add(where + "|" + t.getClass().getName() + "|" + at)) {
             LOG.error("[Last Bastion] Error in {} was caught and skipped (repeats are silenced). Please report it:", where, t);
         }
     }

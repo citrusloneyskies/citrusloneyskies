@@ -126,7 +126,6 @@ public final class SiegeManager {
         d.queue.clear();
         d.tracked.clear();
         d.calledEarly = false;
-        d.victorious = false;
         d.prepTicks = d.rules.i(SiegeRules.PREP_SECONDS) * 20;
         wasNight = isNight(level);
         planNext(level, d);
@@ -281,6 +280,9 @@ public final class SiegeManager {
         d.nextWave = 0;
         d.tracked.clear();
         d.waveTick = 0;
+        d.spawnStalls = 0;
+        d.progressSig = -1;
+        d.progressTick = 0;
         d.waveTotal = WavePlanner.count(d.queue);
         d.waveKilled = 0;
         d.calledEarly = early;
@@ -328,7 +330,7 @@ public final class SiegeManager {
         int maxAlive = d.rules.i(SiegeRules.MAX_ALIVE);
         while (!d.queue.isEmpty() && d.queue.get(0).tick <= d.waveTick && d.tracked.size() < maxAlive) {
             WavePlanner.Group g = d.queue.remove(0);
-            if (!spawnGroup(level, d, core, g)) {
+            if (!spawnGroup(level, d, core, g) && d.spawnStalls < 20) {
                 // nowhere to put them: try again shortly instead of letting the wave end with nobody in it
                 WavePlanner.Group retry = new WavePlanner.Group(d.waveTick + 60, g.angle + 1.3f, g.units);
                 int at = 0;
@@ -343,6 +345,20 @@ public final class SiegeManager {
         }
         if (d.waveTick % 20 == 0) {
             d.tracked.removeIf(id -> gone(level, d, id));
+            // watchdog: a wave whose last enemies can't be found or reached for three minutes is called won
+            int sig = d.tracked.size() * 4096 + d.queue.size() * 64 + d.waveKilled % 64;
+            if (sig != d.progressSig) {
+                d.progressSig = sig;
+                d.progressTick = d.waveTick;
+            } else if (d.waveTick - d.progressTick > 20 * 180 && d.queue.isEmpty()) {
+                for (UUID id : new java.util.ArrayList<>(d.tracked)) {
+                    Entity e = level.getEntity(id);
+                    if (e != null && !(e instanceof SiegeBoss)) e.discard();
+                }
+                d.tracked.removeIf(id -> !(level.getEntity(id) instanceof SiegeBoss));
+                if (!d.tracked.isEmpty()) d.progressTick = d.waveTick;
+                broadcast(level, d, Component.literal("The last stragglers scatter into the night.").withStyle(ChatFormatting.GRAY));
+            }
             d.bossAlive = d.tracked.stream().map(level::getEntity).anyMatch(e -> e instanceof SiegeBoss);
             if (d.queue.isEmpty() && d.tracked.isEmpty()) {
                 completeWave(level, d, core);
@@ -738,6 +754,12 @@ public final class SiegeManager {
     public static void untrack(ServerLevel level, Entity e) {
         SiegeData d = data(level);
         if (d.tracked.remove(e.getUUID())) d.setDirty();
+    }
+
+    /** True when the wave already has its maximum alive (plus headroom for one spawn group): summoned adds are refused. */
+    public static boolean atCapacity(ServerLevel level) {
+        SiegeData d = data(level);
+        return d.state == SiegeState.WAVE && d.tracked.size() >= d.rules.i(SiegeRules.MAX_ALIVE) + 30;
     }
 
     public static void track(ServerLevel level, Entity e) {

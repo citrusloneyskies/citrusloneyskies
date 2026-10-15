@@ -22,6 +22,8 @@ public final class ZombieSpawner {
     @Nullable
     public static SiegeZombie spawn(ServerLevel level, ZombieKind kind, ZombieRank rank, int affixes, Vec3 pos,
                                     boolean waveMob, boolean rise, float hpScale, float dmgScale) {
+        // boss broods, warlord escorts and splitting children can't outgrow the wave: past the cap, nothing more rises
+        if (waveMob && SiegeManager.atCapacity(level)) return null;
         SiegeZombie z = kind.type().get().create(level);
         if (z == null) return null;
         z.moveTo(pos.x, pos.y, pos.z, level.random.nextFloat() * 360f, 0f);

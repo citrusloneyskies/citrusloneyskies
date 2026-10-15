@@ -12,6 +12,15 @@ import java.util.function.Supplier;
 /** One client-side visual effect (beam, slash, telegraph, shake...). Built by {@link com.lastbastion.fx.Vfx}. */
 public record VfxPacket(VfxKind kind, double x, double y, double z, double x2, double y2, double z2, int color, int color2, float size,
                         float extra, int life, int ent1, int ent2) {
+    /** Sizes and lifetimes are clamped on arrival: a bad value can't freeze the client with millions of particles. */
+    public VfxPacket {
+        if (!Float.isFinite(size)) size = 0;
+        if (!Float.isFinite(extra)) extra = 0;
+        size = Math.max(-64, Math.min(64, size));
+        extra = Math.max(-1000, Math.min(1000, extra));
+        life = Math.max(1, Math.min(400, life));
+    }
+
     public VfxPacket(FriendlyByteBuf b) {
         this(VfxKind.byId(b.readByte()), b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(),
                 b.readInt(), b.readInt(), b.readFloat(), b.readFloat(), b.readVarInt(), b.readVarInt() - 1, b.readVarInt() - 1);

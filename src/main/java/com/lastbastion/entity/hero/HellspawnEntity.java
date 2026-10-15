@@ -94,7 +94,12 @@ public class HellspawnEntity extends PathfinderMob implements SiegeAlly {
 
     /** Call up a lesser demon next to a devil; it serves the devil's summoner for {@code ticks}. */
     @Nullable
+    /** Most hellspawn a single devil keeps on the field at once. */
+    public static final int MAX_PER_DEVIL = 8;
+
     public static HellspawnEntity summon(ServerLevel level, HeroEntity devil, Variant v, Vec3 at, int ticks) {
+        UUID devilId = devil.getUUID();
+        if (level.getEntitiesOfClass(HellspawnEntity.class, devil.getBoundingBox().inflate(96), e -> devilId.equals(e.master)).size() >= MAX_PER_DEVIL) return null;
         HellspawnEntity h = type(v).create(level);
         if (h == null) return null;
         Vec3 p = Companions.safeSpotNear(level, h, at);

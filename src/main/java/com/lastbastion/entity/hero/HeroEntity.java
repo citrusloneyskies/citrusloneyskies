@@ -409,7 +409,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
                         .withStyle(ChatFormatting.GRAY), false);
             }
             Vfx.spray(level, FxStyle.SMOKE, position().add(0, getBbHeight() * 0.5, 0), 0x6A6A70, 0x2A2A30, 1f, 20, 0.2f, 0.5f);
-            claimSigilReturn();
+            // its sigil still goes home (to the inventory, or the mailbox if the owner is away)
+            Companions.returnSigil(level, this, false);
             discard();
             return;
         }

@@ -67,6 +67,8 @@ public class SiegeData extends SavedData {
     public final transient Map<UUID, Integer> trackedSeen = new HashMap<>();
     /** Spawn groups that found no ground this wave (for the "the horde can't reach the core" warning). */
     public transient int spawnStalls;
+    /** Wave watchdog: a fingerprint of the wave's progress and when it last changed. */
+    public transient int progressSig, progressTick;
 
     /** A sigil waiting for its owner: {@code recover} ticks of recovery start when it is delivered. */
     public record FallenHero(UUID owner, int heroKind, int level, int xp, int recover) {
@@ -109,7 +111,8 @@ public class SiegeData extends SavedData {
 
     public void addCredits(UUID player, int amount) {
         UUID w = wallet(player);
-        credits.put(w, Math.max(0, credits(player) + amount));
+        // long maths and a ceiling: huge multipliers late in a siege can't wrap a wallet round to zero
+        credits.put(w, (int) Math.max(0, Math.min(1_000_000_000L, (long) credits(player) + amount)));
         setDirty();
     }
 
