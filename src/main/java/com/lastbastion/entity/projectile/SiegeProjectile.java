@@ -141,6 +141,7 @@ public class SiegeProjectile extends Projectile {
 
     @Override
     public void tick() {
+        LivingEntity lbPrev = com.lastbastion.combat.SiegeDamage.pushHostile(getOwner() instanceof com.lastbastion.entity.hero.HeroEntity lbHero ? lbHero.getTarget() : null);
         try {
         super.tick();
         Vec3 motion = getDeltaMovement();
@@ -182,6 +183,8 @@ public class SiegeProjectile extends Projectile {
         if (level().isClientSide) trail(from, end);
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("SiegeProjectile.tick", lbCrash);
+        } finally {
+            com.lastbastion.combat.SiegeDamage.popHostile(lbPrev);
         }
     }
 

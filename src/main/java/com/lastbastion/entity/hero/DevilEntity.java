@@ -30,7 +30,16 @@ public abstract class DevilEntity extends HeroEntity {
     }
 
     public static AttributeSupplier.Builder createDevilAttributes(HeroKind k) {
-        return HeroEntity.createAttributes(k).add(Attributes.KNOCKBACK_RESISTANCE, 1.0).add(Attributes.ARMOR_TOUGHNESS, k.armor / 2);
+        return HeroEntity.createAttributes(k).add(Attributes.KNOCKBACK_RESISTANCE, 1.0).add(Attributes.ARMOR_TOUGHNESS, k.armor / 2)
+                .add(Attributes.MOVEMENT_SPEED, k.speed * SPEED_MULT);
+    }
+
+    /** Devils move far faster than heroes so they can carve through whole waves. */
+    public static final double SPEED_MULT = 1.45;
+
+    @Override
+    protected int cooldownRate() {
+        return 2;
     }
 
     /** True for bosses, warlords, champions and rifts: they resist displacement and crowd control. */

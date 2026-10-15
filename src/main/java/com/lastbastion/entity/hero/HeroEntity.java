@@ -385,11 +385,14 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
 
     @Override
     public void aiStep() {
+        LivingEntity lbPrev = com.lastbastion.combat.SiegeDamage.pushHostile(getTarget());
         try {
         super.aiStep();
         if (level() instanceof ServerLevel sl && isAlive()) brain(sl);
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("HeroEntity.aiStep", lbCrash);
+        } finally {
+            com.lastbastion.combat.SiegeDamage.popHostile(lbPrev);
         }
     }
 
@@ -407,8 +410,9 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             discard();
             return;
         }
-        for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
-        if (attackCooldown > 0) attackCooldown--;
+        int rate = cooldownRate();
+        for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i] = Math.max(0, cooldowns[i] - rate);
+        if (attackCooldown > 0) attackCooldown = Math.max(0, attackCooldown - rate);
         if (dodgeCooldown > 0) dodgeCooldown--;
         boolean fighting = target != null || tickCount - lastCombat < 60;
         if (!fighting && tickCount % 20 == 0 && getHealth() < getMaxHealth()) heal(getMaxHealth() * (retreating ? 0.05f : 0.025f));
@@ -943,6 +947,11 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
 
     protected int attackInterval() {
         return 20;
+    }
+
+    /** How many ticks of skill and attack cooldown recover per tick (devils fight at double tempo). */
+    protected int cooldownRate() {
+        return 1;
     }
 
     protected int comboLength() {

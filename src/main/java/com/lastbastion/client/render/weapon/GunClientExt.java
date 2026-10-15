@@ -19,6 +19,15 @@ public final class GunClientExt implements IClientItemExtensions {
     private GunClientExt() {
     }
 
+    /**
+     * Custom arm poses extend a vanilla enum, so they must exist before Minecraft first switches over it
+     * (at the first player render); creating them later overflows vanilla's pose tables and crashes.
+     * Called from the mod constructor.
+     */
+    public static void init() {
+        pose(true);
+    }
+
     static HumanoidModel.ArmPose pose(boolean oneHanded) {
         if (aim == null) {
             aim = HumanoidModel.ArmPose.create("LASTBASTION_GUN", true, (m, e, arm) -> GunAnimations.armPose(m, e, arm, false));

@@ -24,6 +24,10 @@ public class LastBastion {
     public LastBastion() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
         AttributeCaps.raise();
+        net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT, () -> () -> {
+            com.lastbastion.client.render.weapon.GunClientExt.init();
+            com.lastbastion.client.render.weapon.WeaponClientExt.init();
+        });
         ModBlocks.BLOCKS.register(bus);
         ModItems.ITEMS.register(bus);
         ModBlockEntities.BLOCK_ENTITIES.register(bus);

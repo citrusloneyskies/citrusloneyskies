@@ -152,6 +152,7 @@ public class HellspawnEntity extends PathfinderMob implements SiegeAlly {
 
     @Override
     public void aiStep() {
+        LivingEntity lbPrev = com.lastbastion.combat.SiegeDamage.pushHostile(getTarget());
         try {
         super.aiStep();
         if (!(level() instanceof ServerLevel sl) || !isAlive()) return;
@@ -214,6 +215,8 @@ public class HellspawnEntity extends PathfinderMob implements SiegeAlly {
         }
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("HellspawnEntity.aiStep", lbCrash);
+        } finally {
+            com.lastbastion.combat.SiegeDamage.popHostile(lbPrev);
         }
     }
 

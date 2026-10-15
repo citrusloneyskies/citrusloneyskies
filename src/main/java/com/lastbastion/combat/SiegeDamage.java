@@ -178,7 +178,26 @@ public final class SiegeDamage {
     }
 
     public static List<LivingEntity> enemiesAround(ServerLevel level, Vec3 center, double radius) {
-        return around(level, center, radius, SiegeDamage::isEnemy);
+        LivingEntity extra = extraHostile;
+        return around(level, center, radius, e -> isEnemy(e) || (extra != null && e == extra));
+    }
+
+    /**
+     * While a summon acts, the foe its owner set it on (a cow you struck, a player who hit you) counts as
+     * hostile for every area attack, not just for its single-target blows.
+     */
+    @Nullable
+    private static LivingEntity extraHostile;
+
+    @Nullable
+    public static LivingEntity pushHostile(@Nullable LivingEntity e) {
+        LivingEntity prev = extraHostile;
+        extraHostile = e != null && e.isAlive() && !isDefender(e) ? e : null;
+        return prev;
+    }
+
+    public static void popHostile(@Nullable LivingEntity prev) {
+        extraHostile = prev;
     }
 
     public static List<LivingEntity> defendersAround(ServerLevel level, Vec3 center, double radius) {
