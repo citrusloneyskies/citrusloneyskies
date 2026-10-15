@@ -25,6 +25,9 @@ public enum ArmorSet {
             "Exo Systems", "Jump again in mid-air to fire jump jets (two boosts). No fall damage, and long falls end in a shockwave slam.",
             "Military power armour salvaged from a dead world's last war.");
 
+    /** Siege armour is forged for the horde: ten times the protection of the listed base values. */
+    public static final int STRENGTH = 10;
+
     public final String id, title;
     public final int tier;
     public final int[] defence;
@@ -37,8 +40,9 @@ public enum ArmorSet {
         this.id = id;
         this.title = title;
         this.tier = tier;
-        this.defence = defence;
-        this.toughness = toughness;
+        this.defence = new int[defence.length];
+        for (int i = 0; i < defence.length; i++) this.defence[i] = defence[i] * STRENGTH;
+        this.toughness = toughness * STRENGTH;
         this.knockbackResistance = kb;
         this.cost = cost;
         this.color = color;

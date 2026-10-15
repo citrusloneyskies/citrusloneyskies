@@ -108,6 +108,12 @@ public final class ArmorSets {
     public static void onHurt(LivingHurtEvent e) {
         try {
         if (!(e.getEntity() instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
+        // every piece of siege armour turns away a large share of each blow: a full set takes a tenth of the damage
+        if (!e.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+            int pieces = 0;
+            for (net.minecraft.world.item.ItemStack s : p.getArmorSlots()) if (s.getItem() instanceof SiegeArmorItem) pieces++;
+            if (pieces > 0) e.setAmount(e.getAmount() * (1f - 0.225f * pieces));
+        }
         if (!wearing(p, ArmorSet.VANGUARD)) return;
         e.setAmount(e.getAmount() * 0.85f);
         float after = p.getHealth() - e.getAmount();
