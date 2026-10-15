@@ -24,7 +24,7 @@ import java.util.function.Supplier;
 /** Everything the Siege Core sells. Shared between the client screen and the server purchase handler. */
 public final class ShopCatalog {
     public enum Category {
-        TURRETS("Turrets", 0xFFB000), HEROES("Heroes", 0xFFD966), ARSENAL("Arsenal", 0xFF5050), ARMORY("Armory", 0x6FA8FF), SUPPORT("Support", 0x7FE8FF),
+        TURRETS("Turrets", 0xFFB000), HEROES("Heroes", 0xFFD966), DEVILS("Devils", 0xFF3A2A), ARSENAL("Arsenal", 0xFF5050), ARMORY("Armory", 0x6FA8FF), SUPPORT("Support", 0x7FE8FF),
         SUPPLIES("Supplies", 0x7CFF9B), FORTIFY("Fortify", 0xC8A070), CORE("Core", 0xC86BFF);
         public final String title;
         public final int color;
@@ -112,8 +112,14 @@ public final class ShopCatalog {
                     "Lv3: " + k.perk3, "Lv5: " + k.perk5, "Upgrade to Lv5 total: " + k.totalInvested(TurretKind.MAX_LEVEL) + " credits"));
         }
         for (HeroKind k : HeroKind.values()) {
-            l.add(new Entry("hero_" + k.id, Category.HEROES, k.title, k.cost, stack(ModItems.HERO_SIGILS.get(k), 1), stack(ModItems.HERO_SIGILS.get(k), 1), null,
-                    k.desc, "HP " + (int) k.hp + "   Damage " + (int) k.damage + "   Role: " + k.role.name().charAt(0) + k.role.name().substring(1).toLowerCase(), k.moves));
+            String role = "HP " + (int) k.hp + "   Damage " + (int) k.damage + "   Role: " + k.role.name().charAt(0) + k.role.name().substring(1).toLowerCase();
+            if (k.devil) {
+                l.add(new Entry("devil_" + k.id, Category.DEVILS, k.title, k.cost, () -> new ItemStack(ModItems.sigil(k)), () -> new ItemStack(ModItems.sigil(k)), null,
+                        k.desc, role, k.moves, "Pact: one devil at a time; sealing it costs half your health; a slain devil needs 10 minutes to return."));
+            } else {
+                l.add(new Entry("hero_" + k.id, Category.HEROES, k.title, k.cost, () -> new ItemStack(ModItems.sigil(k)), () -> new ItemStack(ModItems.sigil(k)), null,
+                        k.desc, role, k.moves, "Summon anywhere: guards the core, or follows and fights for you away from it."));
+            }
         }
         l.add(new Entry(UPGRADE_WEAPON, Category.ARSENAL, "Upgrade Held Weapon", 0, () -> new ItemStack(net.minecraft.world.item.Items.SMITHING_TABLE), null, null,
                 "Raises the arsenal weapon in your main hand by one Mk (up to Mk V).",
@@ -273,25 +279,24 @@ public final class ShopCatalog {
         return -1;
     }
 
-    public static int reviveCost(SiegeData.FallenHero f) {
-        return HeroKind.values()[f.heroKind()].cost / 2;
+    /** Credits to make a recovering sigil ready now: up to half the summon's price, shrinking as it recovers. */
+    public static int rushCost(HeroKind k, ItemStack sigil, long now) {
+        float remaining = 1f - com.lastbastion.entity.hero.Companions.recoveryFraction(sigil, now);
+        return Math.max(25, Math.round(k.cost * 0.5f * remaining / 5f) * 5);
     }
 
-    private static Component revive(ServerPlayer player, SiegeData d, int index) {
-        List<SiegeData.FallenHero> mine = new ArrayList<>();
-        for (SiegeData.FallenHero f : d.fallenHeroes) if (f.owner().equals(player.getUUID())) mine.add(f);
-        if (index < 0 || index >= mine.size()) return Component.literal("No such fallen hero.").withStyle(ChatFormatting.RED);
-        SiegeData.FallenHero f = mine.get(index);
-        int cost = reviveCost(f);
+    /** Rush the recovering sigil in inventory slot {@code slot}. */
+    private static Component revive(ServerPlayer player, SiegeData d, int slot) {
+        if (slot < 0 || slot >= player.getInventory().getContainerSize()) return Component.literal("No such sigil.").withStyle(ChatFormatting.RED);
+        ItemStack s = player.getInventory().getItem(slot);
+        if (!(s.getItem() instanceof com.lastbastion.item.HeroSigilItem sig)) return Component.literal("That isn't a sigil.").withStyle(ChatFormatting.RED);
+        long now = player.serverLevel().getGameTime();
+        if (com.lastbastion.entity.hero.Companions.recoveryLeft(s, now) <= 0) return Component.literal(sig.kind.shortName() + " is already ready.").withStyle(ChatFormatting.YELLOW);
+        int cost = rushCost(sig.kind, s, now);
         if (!SiegeManager.spend(player.serverLevel(), player, cost)) return Component.literal("Not enough credits (" + cost + ").").withStyle(ChatFormatting.RED);
-        d.fallenHeroes.remove(f);
-        d.setDirty();
-        HeroKind k = HeroKind.values()[f.heroKind()];
-        ItemStack sigil = new ItemStack(ModItems.HERO_SIGILS.get(k).get());
-        sigil.getOrCreateTag().putInt("lbLevel", f.level());
-        sigil.getOrCreateTag().putInt("lbXp", f.xp());
-        give(player, sigil);
-        return Component.literal(k.title + " is ready to return to battle!").withStyle(ChatFormatting.GOLD);
+        s.getOrCreateTag().remove(com.lastbastion.entity.hero.Companions.TAG_RECOVER);
+        s.getOrCreateTag().remove(com.lastbastion.entity.hero.Companions.TAG_RECOVER_TOTAL);
+        return Component.literal(sig.kind.shortName() + " is ready to return to battle!").withStyle(ChatFormatting.GOLD);
     }
 
     private static void give(ServerPlayer p, ItemStack s) {

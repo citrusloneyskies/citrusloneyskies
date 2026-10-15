@@ -39,6 +39,7 @@ public final class ClientEvents {
         if (!mc.isPaused()) com.lastbastion.client.fx.VfxManager.tick();
         ClientSiegeState.tick();
         ClientDowned.tick();
+        if (mc.level != null) com.lastbastion.item.HeroSigilItem.clientTime = mc.level.getGameTime();
         while (ClientSetup.HERO_COMMAND.consumeClick()) {
             if (mc.screen == null) mc.setScreen(new HeroCommandScreen());
         }

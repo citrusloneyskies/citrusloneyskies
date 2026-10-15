@@ -81,7 +81,23 @@ public final class ModEntities {
         HEROES.put(HeroKind.ASTERION, reg("asterion", AsterionHero::new, MobCategory.CREATURE, 1.4f, 3.1f, 12));
         HEROES.put(HeroKind.ANUBIS, reg("anubis", AnubisHero::new, MobCategory.CREATURE, 0.9f, 2.7f, 12));
         HEROES.put(HeroKind.ZEUS, reg("zeus", ZeusHero::new, MobCategory.CREATURE, 0.95f, 2.8f, 12));
+
+        HEROES.put(HeroKind.LUCIFER, reg("lucifer", LuciferDevil::new, MobCategory.CREATURE, 0.9f, 3.0f, 16));
+        HEROES.put(HeroKind.BEELZEBUB, reg("beelzebub", BeelzebubDevil::new, MobCategory.CREATURE, 1.2f, 2.7f, 16));
+        HEROES.put(HeroKind.ABADDON, reg("abaddon", AbaddonDevil::new, MobCategory.CREATURE, 1.4f, 3.6f, 16));
+        HEROES.put(HeroKind.LEVIATHAN, reg("leviathan", LeviathanDevil::new, MobCategory.CREATURE, 2.0f, 3.2f, 16));
+        HEROES.put(HeroKind.MOLOCH, reg("moloch", MolochDevil::new, MobCategory.CREATURE, 1.5f, 3.4f, 16));
     }
+
+    public static final RegistryObject<EntityType<HellspawnEntity>> IMP = reg("imp",
+            (EntityType<HellspawnEntity> t, net.minecraft.world.level.Level l) -> new HellspawnEntity(t, l, HellspawnEntity.Variant.IMP),
+            MobCategory.CREATURE, 0.6f, 1.1f, 10);
+    public static final RegistryObject<EntityType<HellspawnEntity>> HELLHOUND = reg("hellhound",
+            (EntityType<HellspawnEntity> t, net.minecraft.world.level.Level l) -> new HellspawnEntity(t, l, HellspawnEntity.Variant.HELLHOUND),
+            MobCategory.CREATURE, 1.1f, 1.2f, 10);
+    public static final RegistryObject<EntityType<HellspawnEntity>> FIEND = reg("fiend",
+            (EntityType<HellspawnEntity> t, net.minecraft.world.level.Level l) -> new HellspawnEntity(t, l, HellspawnEntity.Variant.FIEND),
+            MobCategory.CREATURE, 1.4f, 2.6f, 10);
 
     private static <T extends Entity> RegistryObject<EntityType<T>> reg(String name, EntityType.EntityFactory<T> factory, MobCategory cat,
                                                                        float w, float h, int range) {
@@ -109,7 +125,10 @@ public final class ModEntities {
         ZOMBIES.forEach((k, t) -> e.put(t.get(), SiegeZombie.createAttributes(k).build()));
         BOSSES.forEach((k, t) -> e.put(t.get(), SiegeBoss.createAttributes(k).build()));
         TURRETS.forEach((k, t) -> e.put(t.get(), TurretEntity.createAttributes(k).build()));
-        HEROES.forEach((k, t) -> e.put(t.get(), HeroEntity.createAttributes(k).build()));
+        HEROES.forEach((k, t) -> e.put(t.get(), (k.devil ? DevilEntity.createDevilAttributes(k) : HeroEntity.createAttributes(k)).build()));
+        e.put(IMP.get(), HellspawnEntity.createAttributes(HellspawnEntity.Variant.IMP).build());
+        e.put(HELLHOUND.get(), HellspawnEntity.createAttributes(HellspawnEntity.Variant.HELLHOUND).build());
+        e.put(FIEND.get(), HellspawnEntity.createAttributes(HellspawnEntity.Variant.FIEND).build());
         e.put(KAGE_CLONE.get(), HeroEntity.createAttributes(HeroKind.KAGE).build());
         e.put(PHYLACTERY.get(), PhylacteryEntity.createAttributes().build());
         e.put(DRONE.get(), SentryDroneEntity.createAttributes().build());

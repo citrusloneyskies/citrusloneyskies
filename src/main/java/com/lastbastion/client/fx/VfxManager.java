@@ -89,30 +89,55 @@ public final class VfxManager {
             }
         }
         buf.endBatch(VfxRenderTypes.TRANSLUCENT);
-        Draw d = new Draw(buf.getBuffer(VfxRenderTypes.ADDITIVE), m, cp, cam);
+        // dark shapes (black fire, void, shadow) are alpha blended so they can darken the world
+        boolean anyDark = false;
         for (Effect fx : ACTIVE) {
-            switch (fx.p.kind()) {
-                case BEAM -> beam(d, fx, pt);
-                case ARC -> arc(d, fx, pt);
-                case RING -> ring(d, fx, pt);
-                case SLASH -> slash(d, fx, pt);
-                case PILLAR -> pillar(d, fx, pt);
-                case DOME -> dome(d, fx, pt);
-                case SPHERE -> sphere(d, fx, pt);
-                case FLASH -> flash(d, fx, pt);
-                case VORTEX -> vortex(d, fx, pt);
-                case SIGIL -> sigil(d, fx, pt);
-                case TETHER -> tether(d, fx, pt);
-                case WAVE -> wave(d, fx, pt);
-                case AURA -> aura(d, fx, pt);
-                case DASH -> dash(d, fx, pt);
-                case TELE_CIRCLE, TELE_LINE, TELE_CONE, TELE_DONUT -> teleGlow(d, fx, pt);
-                default -> {
-                }
+            if (dark(fx)) {
+                anyDark = true;
+                break;
             }
         }
+        if (anyDark) {
+            Draw dk = new Draw(buf.getBuffer(VfxRenderTypes.TRANSLUCENT), m, cp, cam);
+            for (Effect fx : ACTIVE) if (dark(fx)) shape(dk, fx, pt);
+            buf.endBatch(VfxRenderTypes.TRANSLUCENT);
+        }
+        Draw d = new Draw(buf.getBuffer(VfxRenderTypes.ADDITIVE), m, cp, cam);
+        for (Effect fx : ACTIVE) if (!dark(fx)) shape(d, fx, pt);
         if (dome) coreDome(d, pt);
         buf.endBatch(VfxRenderTypes.ADDITIVE);
+    }
+
+    /** Effects flagged with {@code Vfx.DARK} render alpha-blended (dark colours stay dark). */
+    static boolean dark(Effect fx) {
+        return (fx.p.color() & 0x1000000) != 0;
+    }
+
+    /** The hot core of a shape: white for glows, the given core colour for dark shapes. */
+    static int hot(Effect fx) {
+        return dark(fx) ? fx.p.color2() & 0xFFFFFF : 0xFFFFFF;
+    }
+
+    private static void shape(Draw d, Effect fx, float pt) {
+        switch (fx.p.kind()) {
+            case BEAM -> beam(d, fx, pt);
+            case ARC -> arc(d, fx, pt);
+            case RING -> ring(d, fx, pt);
+            case SLASH -> slash(d, fx, pt);
+            case PILLAR -> pillar(d, fx, pt);
+            case DOME -> dome(d, fx, pt);
+            case SPHERE -> sphere(d, fx, pt);
+            case FLASH -> flash(d, fx, pt);
+            case VORTEX -> vortex(d, fx, pt);
+            case SIGIL -> sigil(d, fx, pt);
+            case TETHER -> tether(d, fx, pt);
+            case WAVE -> wave(d, fx, pt);
+            case AURA -> aura(d, fx, pt);
+            case DASH -> dash(d, fx, pt);
+            case TELE_CIRCLE, TELE_LINE, TELE_CONE, TELE_DONUT -> teleGlow(d, fx, pt);
+            default -> {
+            }
+        }
     }
 
     /** Small immediate-mode helper: world positions in, camera-relative coloured quads out. */
@@ -267,7 +292,7 @@ public final class VfxManager {
         }
         d.glowDisc(from, w * 2.2f, fx.p.color(), 0.8f * fade);
         d.glowDisc(to, w * 3f, fx.p.color(), 0.9f * fade);
-        d.glowDisc(to, w * 1.2f, 0xFFFFFF, fade);
+        d.glowDisc(to, w * 1.2f, hot(fx), fade);
     }
 
     private static void arc(Draw d, Effect fx, float pt) {
@@ -298,7 +323,7 @@ public final class VfxManager {
             Vector3f a = d.rel(prev), b = d.rel(next);
             d.ribbon(a, b, thick * 5, thick * 5, color, 0.18f * fade, 0.18f * fade);
             d.ribbon(a, b, thick * 2, thick * 2, color, 0.7f * fade, 0.7f * fade);
-            d.ribbon(a, b, thick * 0.8f, thick * 0.8f, 0xFFFFFF, fade, fade);
+            d.ribbon(a, b, thick * 0.8f, thick * 0.8f, hot(fx), fade, fade);
             if (depth < 2 && i < n - 1 && r.nextFloat() < branch * 0.22f) {
                 Vec3 bdir = dir.add(p1.scale((r.nextDouble() - 0.5) * 2.2)).add(p2.scale((r.nextDouble() - 0.5) * 2.2)).normalize();
                 drawBolt(d, next, next.add(bdir.scale(len * (0.15 + r.nextDouble() * 0.2))), thick * 0.6f, color, fade * 0.8f, r, branch * 0.5f, depth + 1);
@@ -481,14 +506,14 @@ public final class VfxManager {
         float fade = t < 0.2f ? 1f : 1 - (t - 0.2f) / 0.8f;
         Vector3f c = d.rel(a(fx));
         d.glowDisc(c, s, fx.p.color(), 0.9f * fade);
-        d.glowDisc(c, s * 0.45f, 0xFFFFFF, fade);
+        d.glowDisc(c, s * 0.45f, hot(fx), fade);
         RNG.setSeed(fx.seed);
         int rays = 8;
         for (int i = 0; i < rays; i++) {
             float roll = i * Mth.PI / rays + RNG.nextFloat() * 0.3f + t * 0.4f;
             float len = s * (1.6f + RNG.nextFloat() * 1.4f);
             d.billboard(c, len * 2, s * 0.08f, roll, fx.p.color(), 0.8f * fade);
-            d.billboard(c, len * 1.2f, s * 0.03f, roll, 0xFFFFFF, fade);
+            d.billboard(c, len * 1.2f, s * 0.03f, roll, hot(fx), fade);
         }
     }
 
@@ -576,7 +601,7 @@ public final class VfxManager {
             Vector3f next = d.rel(p);
             d.ribbon(prev, next, w * 2.5f, w * 2.5f, fx.p.color(), 0.2f * fade, 0.2f * fade);
             d.ribbon(prev, next, w, w, fx.p.color(), 0.8f * fade, 0.8f * fade);
-            d.ribbon(prev, next, w * 0.3f, w * 0.3f, 0xFFFFFF, fade, fade);
+            d.ribbon(prev, next, w * 0.3f, w * 0.3f, hot(fx), fade, fade);
             prev = next;
         }
         d.glowDisc(d.rel(to), w * 3, fx.p.color(), 0.7f * fade);
@@ -638,7 +663,7 @@ public final class VfxManager {
         float w = fx.p.size();
         d.ribbon(from, to, 0, w * 2.2f, fx.p.color(), 0, 0.3f * fade);
         d.ribbon(from, to, 0, w, fx.p.color(), 0, 0.8f * fade);
-        d.ribbon(from, to, 0, w * 0.3f, 0xFFFFFF, 0, fade);
+        d.ribbon(from, to, 0, w * 0.3f, hot(fx), 0, fade);
     }
 
     // ------------------------------------------------------------------ telegraphs

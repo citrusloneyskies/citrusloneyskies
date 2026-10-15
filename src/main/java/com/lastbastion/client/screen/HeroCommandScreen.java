@@ -8,10 +8,10 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-/** Quick order wheel (default key G): set every hero you own to Guard / Hunt / Follow. */
+/** Quick orders (default key G): set every hero and devil you own to Guard / Hunt / Follow, or recall them all. */
 public class HeroCommandScreen extends Screen {
     public HeroCommandScreen() {
-        super(Component.literal("Hero Orders"));
+        super(Component.literal("Summon Orders"));
     }
 
     @Override
@@ -24,12 +24,16 @@ public class HeroCommandScreen extends Screen {
                 onClose();
             }).bounds(cx - 60, cy - 30 + i * 24, 120, 20).build());
         }
+        addRenderableWidget(Button.builder(Component.literal("Recall all to me"), b -> {
+            Net.toServer(new ActionPacket(ActionPacket.RECALL_HEROES, 0, ""));
+            onClose();
+        }).bounds(cx - 60, cy - 30 + HeroMode.values().length * 24 + 6, 120, 20).build());
     }
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         renderBackground(g);
-        g.drawCenteredString(font, "Order all your heroes:", width / 2, height / 2 - 46, 0xFFD966);
+        g.drawCenteredString(font, "Order all your heroes and devils:", width / 2, height / 2 - 46, 0xFFD966);
         super.render(g, mx, my, pt);
     }
 

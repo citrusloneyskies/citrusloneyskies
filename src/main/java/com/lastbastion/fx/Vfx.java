@@ -163,6 +163,71 @@ public final class Vfx {
         send(l, VfxKind.SCREEN_FLASH, at, at, color, 0, strength, radius, life);
     }
 
+    // ------------------------------------------------------------------ dark shapes (black fire, void, shadow)
+
+    /**
+     * Flag OR-ed into a shape's colour: the client draws it alpha-blended instead of additively, so black
+     * hellfire, void and shadow actually darken the scene. The second colour becomes the shape's core.
+     */
+    public static final int DARK = 0x1000000;
+
+    public static void darkBeam(ServerLevel l, Vec3 from, Vec3 to, int color, int core, float width, int life, float jitter) {
+        send(l, VfxKind.BEAM, from, to, color | DARK, core, width, jitter, life);
+    }
+
+    public static void darkSphere(ServerLevel l, Vec3 center, int color, int core, float radius, int life) {
+        send(l, VfxKind.SPHERE, center, center, color | DARK, core, radius, 0, life);
+    }
+
+    public static void darkRing(ServerLevel l, Vec3 center, int color, float radius, int life, float height) {
+        send(l, VfxKind.RING, center, center, color | DARK, color, radius, height, life);
+    }
+
+    public static void darkPillar(ServerLevel l, Vec3 ground, int color, int core, float radius, float height, int life) {
+        send(l, VfxKind.PILLAR, ground, ground, color | DARK, core, radius, height, life);
+    }
+
+    public static void darkVortex(ServerLevel l, Vec3 base, int color, int color2, float radius, float height, int life, Entity follow) {
+        send(l, VfxKind.VORTEX, base, base, color | DARK, color2, radius, height, life, follow == null ? -1 : follow.getId(), -1);
+    }
+
+    public static void darkWave(ServerLevel l, Vec3 from, Vec3 to, int color, int core, float width, float height, int life) {
+        send(l, VfxKind.WAVE, from, to, color | DARK, core, width, height, life);
+    }
+
+    public static void darkDash(ServerLevel l, Vec3 from, Vec3 to, int color, int core, float width, int life) {
+        send(l, VfxKind.DASH, from, to, color | DARK, core, width, 0, life);
+    }
+
+    public static void darkSigil(ServerLevel l, Vec3 center, int color, int core, float radius, int life, float spin) {
+        send(l, VfxKind.SIGIL, center, center, color | DARK, core, radius, spin, life);
+    }
+
+    public static void darkSlash(ServerLevel l, Vec3 center, float yaw, float tilt, float sweep, float radius, int color, int core, int life, float thickness) {
+        send(l, VfxKind.SLASH, center, new Vec3(yaw, tilt, sweep), color | DARK, core, radius, thickness, life);
+    }
+
+    public static void darkTether(ServerLevel l, Entity a, float originHeight, Entity b, int color, int core, float width, int life) {
+        send(l, VfxKind.TETHER, a.position(), b.position(), color | DARK, core, width, originHeight, life, a.getId(), b.getId());
+    }
+
+    public static void darkFlash(ServerLevel l, Vec3 at, int color, int core, float size, int life) {
+        send(l, VfxKind.FLASH, at, at, color | DARK, core, size, 0, life);
+    }
+
+    public static void darkAura(ServerLevel l, Entity e, int color, int core, float radius, int life) {
+        send(l, VfxKind.AURA, e.position(), e.position(), color | DARK, core, radius, 0, life, e.getId(), -1);
+    }
+
+    public static void darkDome(ServerLevel l, Vec3 center, int color, int core, float radius, int life, Entity follow) {
+        send(l, VfxKind.DOME, center, center, color | DARK, core, radius, 0, life, follow == null ? -1 : follow.getId(), -1);
+    }
+
+    /** Glowing beam with a custom core colour (e.g. crimson rim around an orange-hot centre). */
+    public static void beam(ServerLevel l, Vec3 from, Vec3 to, int color, int core, float width, int life, float jitter) {
+        send(l, VfxKind.BEAM, from, to, color, core, width, jitter, life);
+    }
+
     // ------------------------------------------------------------------ telegraphs (draw + register danger)
 
     public static final int DANGER = 0xFF3020;

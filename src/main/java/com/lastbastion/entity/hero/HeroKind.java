@@ -6,8 +6,13 @@ import net.minecraft.world.entity.EntityType;
 import java.util.function.Supplier;
 
 /**
- * The ten summonable heroes, from the scrappy dire wolf to the King of Olympus. Every hero fights on
- * the ground where zombies can reach them; Zeus takes to the sky only for the few seconds of his ultimate.
+ * The ten summonable heroes, from the scrappy dire wolf to the King of Olympus, and the five Devils. Every hero
+ * fights on the ground where zombies can reach them; Zeus takes to the sky only for the few seconds of his
+ * ultimate.
+ *
+ * <p>Devils are bound by pact rather than summoned: each player can hold only one, the pact is sealed in the
+ * summoner's blood, and a fallen devil needs ten minutes to claw its way back. In exchange they are the most
+ * powerful beings in the siege.
  */
 public enum HeroKind {
     ASHFANG("ashfang", "Ashfang the Dire Wolf", 350, 90, 7, 4, 0.40, 0x8A8F99, HeroEntity.Role.ASSASSIN,
@@ -39,7 +44,23 @@ public enum HeroKind {
             "Sceptre Strikes / Sand Bolts / Weighing of Hearts (execute) / Sandstorm / Soul Siphon / Curse of the Pharaoh / ULT Hall of Judgement"),
     ZEUS("zeus", "Zeus, King of Olympus", 10000, 820, 40, 20, 0.30, 0xF4F06A, HeroEntity.Role.RANGED,
             "The Thunderer himself, crowned in laurels, wielding the Master Bolt and the Aegis.",
-            "Thunderbolt Javelins / Thunderclap / Chain Storm / Olympian Smite / Aegis of Olympus / ULT Wrath of the Sky (brief flight)");
+            "Thunderbolt Javelins / Thunderclap / Chain Storm / Olympian Smite / Aegis of Olympus / ULT Wrath of the Sky (brief flight)"),
+
+    LUCIFER("lucifer", "Lucifer, King of Hell", 45000, 5200, 120, 30, 0.34, 0xD0141A, HeroEntity.Role.BRUISER,
+            "The first rebel: crowned in black iron thorns under a shattered halo of hellfire, six burnt wings at his back and Perdition, a greatsword forged in the pit.",
+            "Perdition Combo & Rend / The Fall / Damnation / Chains of Hell / Wings of Perdition / Dread Sovereign / Legions of Hell / ULT Hell on Earth", true),
+    BEELZEBUB("beelzebub", "Beelzebub, Lord of the Flies", 36000, 4200, 85, 22, 0.29, 0x8DBE3C, HeroEntity.Role.SUPPORT,
+            "A bloated insect-king in a moth-eaten royal robe, crowned in bone, his compound eyes burning red over a court of flies.",
+            "Swarm Bolts / Plague Swarm / Gluttony / Pestilent Rain / Brood of Flies / Lord of Decay / Bile Torrent / ULT Feast of a Thousand Flies", true),
+    ABADDON("abaddon", "Abaddon, the Destroyer", 40000, 6800, 100, 40, 0.26, 0x8A4CFF, HeroEntity.Role.TANK,
+            "The angel of the bottomless pit: a towering king of black iron and bone with a vortex of void for a heart, a scorpion's tail and the Key of the Abyss.",
+            "Key of the Abyss / Abyss Gate / Chains of the Pit / Scorpion's Torment / Locust Plague / Destroyer's Challenge / Shattering the Seal / ULT The Bottomless Pit", true),
+    LEVIATHAN("leviathan", "Leviathan, Serpent of the Abyss", 48000, 5600, 130, 32, 0.30, 0x2FB8C8, HeroEntity.Role.BRUISER,
+            "The serpent of the black sea: a coiling titan of dark scale and glowing fins with six burning eyes, envy given teeth.",
+            "Abyssal Bite & Tail Lash / Black Tide / Maelstrom / Crushing Coils / Abyssal Breath / The Deep Boils / Abyssal Dive / ULT The Deep Rises", true),
+    MOLOCH("moloch", "Moloch, the Furnace King", 38000, 6000, 105, 34, 0.27, 0xFF7A1A, HeroEntity.Role.TANK,
+            "A bull-headed idol of blackened bronze whose belly is a roaring furnace, chimneys on his shoulders and fire in his palms.",
+            "Burning Blows / Brazen Charge / Furnace Maw / The Offering / Molten Rain / Pillars of Tophet / Brazen Brand / ULT The Valley of Tophet", true);
 
     public final String id, title;
     public final int cost;
@@ -47,9 +68,16 @@ public enum HeroKind {
     public final int color;
     public final HeroEntity.Role role;
     public final String desc, moves;
+    /** Devils: pact-bound, one per player, blood price, long recovery. */
+    public final boolean devil;
 
     HeroKind(String id, String title, int cost, float hp, float damage, float armor, double speed, int color, HeroEntity.Role role,
              String desc, String moves) {
+        this(id, title, cost, hp, damage, armor, speed, color, role, desc, moves, false);
+    }
+
+    HeroKind(String id, String title, int cost, float hp, float damage, float armor, double speed, int color, HeroEntity.Role role,
+             String desc, String moves, boolean devil) {
         this.id = id;
         this.title = title;
         this.cost = cost;
@@ -61,6 +89,13 @@ public enum HeroKind {
         this.role = role;
         this.desc = desc;
         this.moves = moves;
+        this.devil = devil;
+    }
+
+    /** First name, for messages ("Lucifer", "Sir Aldric"). */
+    public String shortName() {
+        int i = title.indexOf(',');
+        return i > 0 ? title.substring(0, i) : title;
     }
 
     public Supplier<? extends EntityType<? extends HeroEntity>> type() {

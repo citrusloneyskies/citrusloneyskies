@@ -31,7 +31,7 @@ public class HeroScreen extends Screen {
             addRenderableWidget(Button.builder(Component.literal(m.title), b -> Net.toServer(new ActionPacket(ActionPacket.HERO_MODE, hero.getId(), m.name())))
                     .bounds(left + 6 + i * (bw + 2), top + H - 50, bw, 20).build());
         }
-        addRenderableWidget(Button.builder(Component.literal("Dismiss (refund 40%)"), b -> {
+        addRenderableWidget(Button.builder(Component.literal(hero.kind.devil ? "Release (returns to the pact)" : "Dismiss (returns to the sigil)"), b -> {
             Net.toServer(new ActionPacket(ActionPacket.HERO_DISMISS, hero.getId(), ""));
             onClose();
         }).bounds(left + 6, top + H - 26, W - 12, 20).build());

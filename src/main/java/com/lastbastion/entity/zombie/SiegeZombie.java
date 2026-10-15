@@ -366,6 +366,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
 
     @Override
     public float elementMultiplier(Element e) {
+        if (e == Element.INFERNAL) return 1.25f;
         float m = switch (e) {
             case HOLY -> 1.5f;
             case POISON -> 0.75f;

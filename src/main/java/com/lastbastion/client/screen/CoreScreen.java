@@ -25,7 +25,8 @@ import java.util.List;
 
 /**
  * The Siege Core "war room": a tabbed shop (turrets, heroes, arsenal, support, supplies, fortifications,
- * core upgrades) plus a Command tab to manage heroes, revive the fallen and sound the war horn early.
+ * core upgrades) plus a Command tab: orders for your summons, rushing fallen ones back, wave intel, the siege
+ * rules and the war horn.
  */
 public class CoreScreen extends Screen {
     private static int lastTab = 0;
@@ -74,6 +75,42 @@ public class CoreScreen extends Screen {
     }
 
     private final List<Button> dynamic = new ArrayList<>();
+    private final List<Button> rushButtons = new ArrayList<>();
+    private final List<Integer> rushSlots = new ArrayList<>();
+
+    /** Inventory slots holding sigils or pacts that are still recovering from a defeat. */
+    private static List<Integer> recoveringSlots() {
+        var p = Minecraft.getInstance().player;
+        var lvl = Minecraft.getInstance().level;
+        List<Integer> out = new ArrayList<>();
+        if (p == null || lvl == null) return out;
+        long now = lvl.getGameTime();
+        for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
+            ItemStack st = p.getInventory().getItem(i);
+            if (st.getItem() instanceof com.lastbastion.item.HeroSigilItem && com.lastbastion.entity.hero.Companions.recoveryLeft(st, now) > 0) out.add(i);
+        }
+        return out;
+    }
+
+    private void updateRushButtons() {
+        var p = Minecraft.getInstance().player;
+        var lvl = Minecraft.getInstance().level;
+        if (p == null || lvl == null) return;
+        long now = lvl.getGameTime();
+        for (int i = 0; i < rushButtons.size(); i++) {
+            Button b = rushButtons.get(i);
+            ItemStack st = p.getInventory().getItem(rushSlots.get(i));
+            if (!(st.getItem() instanceof com.lastbastion.item.HeroSigilItem sig) || com.lastbastion.entity.hero.Companions.recoveryLeft(st, now) <= 0) {
+                b.active = false;
+                b.setMessage(Component.literal("Ready"));
+                continue;
+            }
+            long secs = (com.lastbastion.entity.hero.Companions.recoveryLeft(st, now) + 19) / 20;
+            int cost = ShopCatalog.rushCost(sig.kind, st, now);
+            b.setMessage(Component.literal("Rush " + sig.kind.shortName() + " (" + secs / 60 + ":" + String.format("%02d", secs % 60) + " left) - " + String.format("%,d", cost)));
+            b.active = ClientSiegeState.credits() >= cost;
+        }
+    }
 
     private void clearWidgetsExceptBuy() {
         for (Button b : dynamic) removeWidget(b);
@@ -102,15 +139,19 @@ public class CoreScreen extends Screen {
             dynamic.add(addRenderableWidget(Button.builder(Component.literal("All: " + m.title),
                     b -> Net.toServer(new ActionPacket(ActionPacket.ALL_HEROES_MODE, 0, m.name()))).bounds(x + i * (bw + 4), y, bw, 20).build()));
         }
-        int nFallen = Math.min(fallen.length / 2, 3);
-        y = top + h - 6 - nFallen * 20;
-        for (int i = 0; i + 1 < fallen.length && i / 2 < nFallen; i += 2) {
-            HeroKind k = HeroKind.values()[fallen[i]];
-            int idx = i / 2;
-            int cost = k.cost / 2;
-            Button b = Button.builder(Component.literal("Revive " + k.title + " (Lv" + fallen[i + 1] + ") - " + cost),
-                    btn -> Net.toServer(new ActionPacket(ActionPacket.BUY, idx, "revive"))).bounds(x, y, w - 100, 18).build();
-            b.active = ClientSiegeState.credits() >= cost;
+        rushSlots.clear();
+        rushButtons.clear();
+        List<Integer> rec = recoveringSlots();
+        int nRush = Math.min(rec.size(), 3);
+        y = top + h - 6 - nRush * 20;
+        for (int i = 0; i < nRush; i++) {
+            int slot = rec.get(i);
+            Button b = Button.builder(Component.literal("Rush"), btn -> {
+                Net.toServer(new ActionPacket(ActionPacket.BUY, slot, "revive"));
+                refresh();
+            }).bounds(x, y, w - 100, 18).build();
+            rushSlots.add(slot);
+            rushButtons.add(b);
             dynamic.add(addRenderableWidget(b));
             y += 20;
         }
@@ -218,13 +259,13 @@ public class CoreScreen extends Screen {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
         // left column: your heroes
-        g.drawString(font, "Your heroes on the field:", x, y, 0x7CFF9B, false);
+        g.drawString(font, "Your summons nearby:", x, y, 0x7CFF9B, false);
         int hy = y + 12;
         List<HeroEntity> heroes = mc.level.getEntitiesOfClass(HeroEntity.class, new AABB(core).inflate(96),
-                hh -> mc.player.getUUID().equals(hh.getOwnerId()));
+                hh -> mc.player.getUUID().equals(hh.getOwnerId()) && !(hh instanceof com.lastbastion.entity.hero.KageCloneEntity));
         if (heroes.isEmpty()) g.drawString(font, font.plainSubstrByWidth("none yet (Heroes tab)", colW), x + 4, hy, 0x808080, false);
         int count = 0;
-        int maxRows = Math.max(1, (top + h - 24 - Math.min(fallen.length / 2, 3) * 20 - hy) / 10);
+        int maxRows = Math.max(1, (top + h - 24 - rushButtons.size() * 20 - hy) / 10);
         for (HeroEntity he : heroes) {
             if (count++ >= maxRows) break;
             String st = he.kind.title.split(",")[0] + " Lv" + he.heroLevel() + " " + Math.round(100 * he.getHealth() / he.getMaxHealth()) + "%";
@@ -268,8 +309,9 @@ public class CoreScreen extends Screen {
             g.drawString(font, "Intel arrives once the", ix + 2, y + 2, 0x808080, false);
             g.drawString(font, "next wave is planned.", ix + 2, y + 12, 0x808080, false);
         }
-        int ry = top + h - 6 - Math.min(fallen.length / 2, 3) * 20;
-        if (fallen.length > 0) g.drawString(font, "Fallen heroes (revive for half price):", x, ry - 11, 0xFF8080, false);
+        updateRushButtons();
+        int ry = top + h - 6 - rushButtons.size() * 20;
+        if (!rushButtons.isEmpty()) g.drawString(font, "Recovering summons (rush them back):", x, ry - 11, 0xFF8080, false);
     }
 
     @Override

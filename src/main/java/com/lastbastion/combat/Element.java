@@ -16,7 +16,9 @@ public enum Element {
     ARCANE(0xC86BFF),
     WIND(0xCFFFF0),
     HOLY(0xFFF2B0),
-    SHADOW(0x5A2A7A);
+    SHADOW(0x5A2A7A),
+    /** Hellfire wielded by the Devils: pierces armour and burns the damned (undead take extra). Nothing is immune. */
+    INFERNAL(0xE0301A);
 
     public final int color;
 

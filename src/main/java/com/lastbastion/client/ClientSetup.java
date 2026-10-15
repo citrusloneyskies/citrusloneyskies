@@ -51,6 +51,9 @@ public final class ClientSetup {
         e.registerEntityRenderer(ModEntities.DRONE.get(), MiscModels::droneRenderer);
         e.registerEntityRenderer(ModEntities.SUPPLY_CRATE.get(), com.lastbastion.client.model.RaidModels::crateRenderer);
         e.registerEntityRenderer(ModEntities.RIFT.get(), com.lastbastion.client.model.RaidModels::riftRenderer);
+        e.registerEntityRenderer(ModEntities.IMP.get(), ctx -> com.lastbastion.client.model.HellspawnModels.renderer(ctx, com.lastbastion.entity.hero.HellspawnEntity.Variant.IMP));
+        e.registerEntityRenderer(ModEntities.HELLHOUND.get(), ctx -> com.lastbastion.client.model.HellspawnModels.renderer(ctx, com.lastbastion.entity.hero.HellspawnEntity.Variant.HELLHOUND));
+        e.registerEntityRenderer(ModEntities.FIEND.get(), ctx -> com.lastbastion.client.model.HellspawnModels.renderer(ctx, com.lastbastion.entity.hero.HellspawnEntity.Variant.FIEND));
         e.registerBlockEntityRenderer(ModBlockEntities.SIEGE_CORE.get(), CoreCrystalRenderer::new);
     }
 

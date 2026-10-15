@@ -29,12 +29,19 @@ import net.minecraft.world.phys.Vec3;
 import javax.annotation.Nullable;
 import java.util.List;
 
-/** Summons a hero bound to the user. Revived heroes carry their level and XP on the sigil. */
+/**
+ * Summons a hero (sigil) or binds a devil (pact) to the user - anywhere, no Siege Core required. Near a core the
+ * summon guards it; elsewhere it follows its summoner. Sigils carry the summon's level and experience; after a
+ * defeat they need time to recover (rushable at the core). Devils are limited to one per player and cost half the
+ * summoner's health to bind.
+ */
 public class HeroSigilItem extends Item {
     public final HeroKind kind;
+    /** Client game time, updated every client tick, for the recovery bar (items have no level there). */
+    public static long clientTime;
 
     public HeroSigilItem(Properties p, HeroKind kind) {
-        super(p.rarity(kind.ordinal() >= 7 ? Rarity.EPIC : kind.ordinal() >= 4 ? Rarity.RARE : Rarity.UNCOMMON));
+        super(p.rarity(kind.devil || kind.ordinal() >= 7 ? Rarity.EPIC : kind.ordinal() >= 4 ? Rarity.RARE : Rarity.UNCOMMON).fireResistant());
         this.kind = kind;
     }
 
@@ -42,28 +49,75 @@ public class HeroSigilItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!(level instanceof ServerLevel sl)) return InteractionResultHolder.success(stack);
+        long left = com.lastbastion.entity.hero.Companions.recoveryLeft(stack, sl.getGameTime());
+        if (left > 0 && !player.getAbilities().instabuild) {
+            long secs = (left + 19) / 20;
+            player.displayClientMessage(Component.literal(kind.shortName() + " is still recovering (" + secs / 60 + ":" + String.format("%02d", secs % 60)
+                    + "). Rush it at a Siege Core.").withStyle(ChatFormatting.RED), true);
+            return InteractionResultHolder.fail(stack);
+        }
         BlockPos core = SiegeManager.corePos(sl);
-        if (core == null || !core.closerToCenterThan(player.position(), SiegeConfig.BUILD_RADIUS.get() + 16)) {
-            player.displayClientMessage(Component.literal("Heroes answer only near an active Siege Core.").withStyle(ChatFormatting.RED), true);
+        boolean nearCore = core != null && core.closerToCenterThan(player.position(), SiegeConfig.BUILD_RADIUS.get() + 16);
+        if (!nearCore && !SiegeConfig.SUMMON_ANYWHERE.get()) {
+            player.displayClientMessage(Component.literal("This server only allows summoning near an active Siege Core.").withStyle(ChatFormatting.RED), true);
+            return InteractionResultHolder.fail(stack);
+        }
+        var mine = com.lastbastion.entity.hero.Companions.ownedAnywhere(sl.getServer(), player.getUUID(), kind.devil);
+        if (kind.devil && !mine.isEmpty()) {
+            player.displayClientMessage(Component.literal("You are already bound to " + mine.get(0).kind.shortName() + ". A soul can carry only one pact.")
+                    .withStyle(ChatFormatting.DARK_RED), true);
+            return InteractionResultHolder.fail(stack);
+        }
+        if (!kind.devil && mine.size() >= SiegeConfig.MAX_HEROES.get()) {
+            player.displayClientMessage(Component.literal("You already command " + mine.size() + " heroes (the limit). Dismiss one first.").withStyle(ChatFormatting.RED), true);
             return InteractionResultHolder.fail(stack);
         }
         HeroEntity hero = kind.type().get().create(sl);
         if (hero == null) return InteractionResultHolder.fail(stack);
-        Vec3 at = player.position().add(player.getLookAngle().multiply(1, 0, 1).normalize().scale(2.5));
-        hero.moveTo(at.x, player.getY(), at.z, player.getYRot(), 0);
+        Vec3 want = player.position().add(player.getLookAngle().multiply(1, 0, 1).normalize().scale(2.5 + kind.hp / 1500.0));
+        Vec3 at = com.lastbastion.entity.hero.Companions.safeSpotNear(sl, hero, want);
+        hero.moveTo(at.x, at.y, at.z, player.getYRot() + 180f, 0);
+        hero.setYHeadRot(player.getYRot() + 180f);
         hero.setOwnerId(player.getUUID());
         hero.finalizeSpawn(sl, sl.getCurrentDifficultyAt(player.blockPosition()), MobSpawnType.EVENT, null, null);
         var tag = stack.getTag();
         hero.setLevelAndXp(tag != null ? Math.max(1, tag.getInt("lbLevel")) : 1, tag != null ? tag.getInt("lbXp") : 0);
         hero.setHealth(hero.getMaxHealth());
-        hero.setMode(HeroMode.GUARD);
+        hero.setMode(nearCore ? HeroMode.GUARD : HeroMode.FOLLOW);
+        if (kind.devil && SiegeConfig.DEVIL_BLOOD_PRICE.get() && !player.getAbilities().instabuild) {
+            // the blood pact: half the summoner's health, never lethal
+            float price = Math.min(player.getHealth() - 1f, player.getHealth() * 0.5f);
+            if (price > 0) player.setHealth(player.getHealth() - price);
+            player.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.WEAKNESS, 200, 0));
+            Vfx.spray(sl, FxStyle.DROP, player.position().add(0, 1.2, 0), 0xC01010, 0x5A0808, 0.15f, 16, 0.2f, 0.5f);
+            sl.playSound(null, player.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1f, 0.6f);
+        }
         sl.addFreshEntity(hero);
         arrival(sl, hero);
         hero.onSummoned(sl);
         if (!player.getAbilities().instabuild) stack.shrink(1);
-        player.displayClientMessage(Component.literal(kind.title + " answers your call! (Sneak + right-click to change orders)")
-                .withStyle(ChatFormatting.GOLD), false);
+        String verb = kind.devil ? " is bound to you by blood!" : " answers your call!";
+        String where = nearCore ? " (guarding the core)" : " (following you)";
+        player.displayClientMessage(Component.literal(kind.title + verb + where + "  Sneak + right-click to change orders.")
+                .withStyle(kind.devil ? ChatFormatting.DARK_RED : ChatFormatting.GOLD), false);
         return InteractionResultHolder.consume(stack);
+    }
+
+    // ------------------------------------------------------------------ recovery bar
+
+    @Override
+    public boolean isBarVisible(ItemStack stack) {
+        return com.lastbastion.entity.hero.Companions.recoveryLeft(stack, clientTime) > 0;
+    }
+
+    @Override
+    public int getBarWidth(ItemStack stack) {
+        return Math.round(13f * com.lastbastion.entity.hero.Companions.recoveryFraction(stack, clientTime));
+    }
+
+    @Override
+    public int getBarColor(ItemStack stack) {
+        return kind.devil ? 0xD02020 : 0xC8A0FF;
     }
 
     /** Each hero gets a signature arrival. */
@@ -125,22 +179,37 @@ public class HeroSigilItem extends Item {
                 Vfx.screenFlash(sl, p, 0xFFFFE0, 0.35f, 40, 8);
                 sl.playSound(null, hero.blockPosition(), SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, 4f, 0.7f);
             }
+            default -> {
+                // devils stage their own arrival (see DevilEntity#onSummoned)
+            }
         }
         Vfx.ring(sl, p.add(0, 0.05, 0), hero.kind.color, 2 + w, 14, 0.6f);
     }
 
     @Override
     public boolean isFoil(ItemStack stack) {
-        return kind.ordinal() >= 7;
+        return kind.devil || kind.ordinal() >= 7;
     }
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        if (kind.devil) tip.add(Component.literal("DEVIL PACT").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
         tip.add(Component.literal(kind.desc).withStyle(ChatFormatting.GRAY));
-        tip.add(Component.literal(kind.moves).withStyle(ChatFormatting.DARK_AQUA));
+        tip.add(Component.literal(kind.moves).withStyle(kind.devil ? ChatFormatting.RED : ChatFormatting.DARK_AQUA));
         tip.add(Component.literal("HP " + (int) kind.hp + "  Damage " + (int) kind.damage + "  Role: " + kind.role.name().toLowerCase()).withStyle(ChatFormatting.GREEN));
         var tag = stack.getTag();
         if (tag != null && tag.getInt("lbLevel") > 1) tip.add(Component.literal("Veteran: Level " + tag.getInt("lbLevel")).withStyle(ChatFormatting.GOLD));
-        tip.add(Component.literal("Right-click near the core to summon.").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+        if (level != null) {
+            long left = com.lastbastion.entity.hero.Companions.recoveryLeft(stack, level.getGameTime());
+            if (left > 0) {
+                long secs = (left + 19) / 20;
+                tip.add(Component.literal("Recovering: " + secs / 60 + ":" + String.format("%02d", secs % 60)).withStyle(ChatFormatting.RED));
+            }
+        }
+        if (kind.devil) {
+            tip.add(Component.literal("One pact per soul. Binding costs half your health.").withStyle(ChatFormatting.DARK_RED, ChatFormatting.ITALIC));
+        }
+        tip.add(Component.literal("Right-click to summon - anywhere. Near a Siege Core it guards the core; elsewhere it follows you.")
+                .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
     }
 }

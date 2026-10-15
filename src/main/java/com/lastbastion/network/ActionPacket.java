@@ -21,7 +21,18 @@ import java.util.function.Supplier;
 /** All client -> server UI actions: shop purchases, turret console, hero orders, calling the next wave. */
 public record ActionPacket(int action, int target, String id) {
     public static final int BUY = 0, TURRET_UPGRADE = 1, TURRET_SELL = 2, TURRET_REPAIR = 3, TURRET_MODE = 4,
-            HERO_MODE = 5, HERO_DISMISS = 6, CALL_WAVE = 7, ALL_HEROES_MODE = 8, REFRESH_CORE = 9, CORE_ABILITY = 10, OPEN_RULES = 11;
+            HERO_MODE = 5, HERO_DISMISS = 6, CALL_WAVE = 7, ALL_HEROES_MODE = 8, REFRESH_CORE = 9, CORE_ABILITY = 10, OPEN_RULES = 11,
+            RECALL_HEROES = 12;
+
+    private static int recall(ServerLevel level, ServerPlayer p, HeroEntity h) {
+        net.minecraft.world.phys.Vec3 at = com.lastbastion.entity.hero.Companions.safeSpotNear(level, h, p.position());
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF, h.getX(), h.getY() + 1, h.getZ(), 12, 0.4, 0.6, 0.4, 0.02);
+        h.teleportTo(at.x, at.y, at.z);
+        h.getNavigation().stop();
+        h.setMode(HeroMode.FOLLOW);
+        com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.STAR, at.add(0, 1, 0), 0xFFFFFF, h.kind.color, 0.25f, 12, 0.2f, 0);
+        return 1;
+    }
 
     public ActionPacket(FriendlyByteBuf b) {
         this(b.readVarInt(), b.readVarInt(), b.readUtf(64));
@@ -69,17 +80,23 @@ public record ActionPacket(int action, int target, String id) {
                 Entity e = level.getEntity(target);
                 if (!(e instanceof HeroEntity h) || !p.getUUID().equals(h.getOwnerId())) return;
                 if (action == HERO_DISMISS) {
-                    int refund = (int) (h.kind.cost * 0.4f);
-                    SiegeManager.data(level).addCredits(p.getUUID(), refund);
+                    com.lastbastion.entity.hero.Companions.returnSigil(level, h, false);
                     level.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF, h.getX(), h.getY() + 1, h.getZ(), 20, 0.4, 0.6, 0.4, 0.02);
                     h.discard();
-                    p.displayClientMessage(Component.literal(h.kind.title + " departs. Refunded " + refund + " credits."), true);
+                    p.displayClientMessage(Component.literal(h.kind.shortName() + " returns to " + (h.kind.devil ? "the pact." : "the sigil.")), true);
                 } else {
                     try {
                         h.setMode(HeroMode.valueOf(id));
                     } catch (IllegalArgumentException ignored) {
                     }
                 }
+            }
+            case RECALL_HEROES -> {
+                int n = 0;
+                List<HeroEntity> mine = new ArrayList<>(com.lastbastion.entity.hero.Companions.owned(level, p.getUUID(), false));
+                mine.addAll(com.lastbastion.entity.hero.Companions.owned(level, p.getUUID(), true));
+                for (HeroEntity h : mine) n += recall(level, p, h);
+                p.displayClientMessage(Component.literal(n == 0 ? "No summons in this dimension." : n + " summons recalled to your side.").withStyle(ChatFormatting.AQUA), true);
             }
             case ALL_HEROES_MODE -> {
                 HeroMode m;
@@ -90,12 +107,12 @@ public record ActionPacket(int action, int target, String id) {
                 }
                 int n = 0;
                 for (Entity e : level.getAllEntities()) {
-                    if (e instanceof HeroEntity h && p.getUUID().equals(h.getOwnerId())) {
+                    if (e instanceof HeroEntity h && p.getUUID().equals(h.getOwnerId()) && !(h instanceof com.lastbastion.entity.hero.KageCloneEntity)) {
                         h.setMode(m);
                         n++;
                     }
                 }
-                p.displayClientMessage(Component.literal(n + " heroes ordered to: " + m.title).withStyle(ChatFormatting.AQUA), true);
+                p.displayClientMessage(Component.literal(n + " summons ordered to: " + m.title).withStyle(ChatFormatting.AQUA), true);
             }
             case CALL_WAVE -> SiegeManager.callWaveEarly(level, p);
             case OPEN_RULES -> SiegeManager.openRules(p);
@@ -108,15 +125,9 @@ public record ActionPacket(int action, int target, String id) {
         }
     }
 
+    /** Kept for the screen packet; recovering sigils are now read from the client's own inventory. */
     public static int[] fallenFor(ServerPlayer p) {
-        SiegeData d = SiegeManager.data(p.serverLevel());
-        List<Integer> out = new ArrayList<>();
-        for (SiegeData.FallenHero f : d.fallenHeroes) {
-            if (f.owner().equals(p.getUUID())) {
-                out.add(f.heroKind());
-                out.add(f.level());
-            }
-        }
-        return out.stream().mapToInt(Integer::intValue).toArray();
+        com.lastbastion.entity.hero.Companions.deliverMail(p);
+        return new int[0];
     }
 }

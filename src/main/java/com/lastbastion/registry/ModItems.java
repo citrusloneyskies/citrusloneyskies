@@ -26,6 +26,8 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.SIEGE_CORE.get(), new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
     public static final Map<TurretKind, RegistryObject<Item>> TURRET_KITS = new EnumMap<>(TurretKind.class);
     public static final Map<HeroKind, RegistryObject<Item>> HERO_SIGILS = new EnumMap<>(HeroKind.class);
+    /** Devil pacts (the devils' summoning items). */
+    public static final Map<HeroKind, RegistryObject<Item>> DEVIL_PACTS = new EnumMap<>(HeroKind.class);
     public static final Map<GunItem.GunKind, RegistryObject<Item>> GUNS = new EnumMap<>(GunItem.GunKind.class);
     public static final Map<GrenadeItem.Kind, RegistryObject<Item>> GRENADES = new EnumMap<>(GrenadeItem.Kind.class);
     public static final Map<ConsumableItem.Kind, RegistryObject<Item>> CONSUMABLES = new EnumMap<>(ConsumableItem.Kind.class);
@@ -40,7 +42,8 @@ public final class ModItems {
             TURRET_KITS.put(k, ITEMS.register("turret_kit_" + k.id, () -> new TurretKitItem(new Item.Properties().stacksTo(16), k)));
         }
         for (HeroKind k : HeroKind.values()) {
-            HERO_SIGILS.put(k, ITEMS.register("sigil_" + k.id, () -> new HeroSigilItem(new Item.Properties().stacksTo(1), k)));
+            if (k.devil) DEVIL_PACTS.put(k, ITEMS.register("pact_" + k.id, () -> new HeroSigilItem(new Item.Properties().stacksTo(1), k)));
+            else HERO_SIGILS.put(k, ITEMS.register("sigil_" + k.id, () -> new HeroSigilItem(new Item.Properties().stacksTo(1), k)));
         }
         for (WeaponKind k : WeaponKind.values()) {
             MELEE.put(k, ITEMS.register(k.id, () -> new MeleeWeaponItem(new Item.Properties(), k)));
@@ -82,6 +85,11 @@ public final class ModItems {
 
     private static RegistryObject<Item> block(String name, RegistryObject<net.minecraft.world.level.block.Block> b) {
         return ITEMS.register(name, () -> new BlockItem(b.get(), new Item.Properties()));
+    }
+
+    /** The summoning item for a hero (sigil) or devil (pact). */
+    public static Item sigil(HeroKind k) {
+        return (k.devil ? DEVIL_PACTS : HERO_SIGILS).get(k).get();
     }
 
     private ModItems() {

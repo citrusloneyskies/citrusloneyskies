@@ -117,6 +117,7 @@ public final class SiegeDamage {
             if (responsible != null) target.getPersistentData().putUUID(TAG_KILLER, responsible.getUUID());
         }
         target.getPersistentData().putString(TAG_ELEMENT, element.name());
+        if (element == Element.INFERNAL) pierceArmor = true;
         DamageSource source = pierceArmor && responsible != null
                 ? target.damageSources().indirectMagic(direct != null ? direct : responsible, responsible)
                 : source(target, direct, responsible, element);

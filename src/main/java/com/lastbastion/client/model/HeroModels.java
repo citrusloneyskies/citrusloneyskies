@@ -66,6 +66,11 @@ public final class HeroModels {
         DEFS.put(HeroKind.ASTERION, new AsterionModel());
         DEFS.put(HeroKind.ANUBIS, new AnubisModel());
         DEFS.put(HeroKind.ZEUS, new ZeusModel());
+        DEFS.put(HeroKind.LUCIFER, new LuciferModel());
+        DEFS.put(HeroKind.BEELZEBUB, new BeelzebubModel());
+        DEFS.put(HeroKind.ABADDON, new AbaddonModel());
+        DEFS.put(HeroKind.LEVIATHAN, new LeviathanModel());
+        DEFS.put(HeroKind.MOLOCH, new MolochModel());
     }
 
     private HeroModels() {

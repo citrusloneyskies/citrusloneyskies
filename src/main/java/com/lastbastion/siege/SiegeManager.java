@@ -579,15 +579,17 @@ public final class SiegeManager {
         com.lastbastion.siege.raid.RaidEvents.clear(level, d);
         com.lastbastion.siege.raid.Downed.reviveAll(level);
         if (d.rules.on(SiegeRules.HARSH_DEFEAT)) {
+            // turrets around the core are destroyed; summons defending it fall (their sigils return, recovering)
             List<Entity> doomed = new ArrayList<>();
             for (Entity e : level.getAllEntities()) {
-                if (e instanceof TurretEntity || e instanceof HeroEntity) doomed.add(e);
+                if (e instanceof TurretEntity && e.position().distanceToSqr(c) < 96 * 96) doomed.add(e);
+                if (e instanceof HeroEntity h && !(h instanceof com.lastbastion.entity.hero.KageCloneEntity) && e.position().distanceToSqr(c) < 64 * 64) doomed.add(e);
             }
             for (Entity e : doomed) {
                 level.sendParticles(ParticleTypes.LARGE_SMOKE, e.getX(), e.getY() + 0.5, e.getZ(), 15, 0.4, 0.5, 0.4, 0.02);
+                if (e instanceof HeroEntity h) com.lastbastion.entity.hero.Companions.returnSigil(level, h, true);
                 e.discard();
             }
-            d.fallenHeroes.clear();
             Arrays.fill(d.upgrades, 0);
         }
         double keep = d.rules.i(SiegeRules.SALVAGE) / 100.0;

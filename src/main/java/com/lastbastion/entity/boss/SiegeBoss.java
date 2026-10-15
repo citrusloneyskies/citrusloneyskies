@@ -273,6 +273,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
             case HOLY -> 1.3f;
             case SHADOW -> 0f;
             case POISON -> 0.6f;
+            case INFERNAL -> 1.15f;
             default -> 1f;
         };
     }

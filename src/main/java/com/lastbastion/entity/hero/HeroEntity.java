@@ -67,7 +67,9 @@ import java.util.UUID;
  *   <li><b>Idle</b> - GUARD holds a post at the core, FOLLOW escorts the owner, HUNT patrols the ring.</li>
  * </ol>
  * Heroes regenerate out of combat, level up from kills (Lv 1-5, +12% HP/damage per level, extra gear on the
- * model), speak a few lines in character, and when slain can be revived at the core for half price.
+ * model) and speak a few lines in character. They don't need a Siege Core: away from one they guard the spot they
+ * were ordered to, hunt around their summoner, or follow them (through portals too), joining whatever fight their
+ * summoner picks and defending them when struck. When slain, their sigil returns to the summoner and recovers.
  */
 public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     /** Basic attack animation ids are 1..5 (combo step); hero skills use 6..19. */
@@ -107,6 +109,13 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     private int strafeDir = 1;
     private int strafeTimer;
     private final float postAngle;
+    /** Where a Guard order was given (used when there is no Siege Core around). */
+    @Nullable
+    private BlockPos guardPos;
+    /** Something the owner is fighting (or that attacked us) - fought even if it isn't a monster. */
+    @Nullable
+    private LivingEntity commanded;
+    private int commandedUntil;
 
     protected HeroEntity(EntityType<? extends HeroEntity> type, Level level, HeroKind kind) {
         super(type, level);
@@ -180,6 +189,51 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         target = null;
         retarget = 0;
         retreating = false;
+        commanded = null;
+        if (m == HeroMode.GUARD) guardPos = blockPosition();
+    }
+
+    public void setGuardPos(@Nullable BlockPos p) {
+        guardPos = p == null ? null : p.immutable();
+    }
+
+    /** The Siege Core this hero serves, if one is near enough to matter (heroes far from it act as companions). */
+    @Nullable
+    public BlockPos core(ServerLevel level) {
+        BlockPos c = SiegeManager.corePos(level);
+        return c != null && c.distSqr(blockPosition()) < 160 * 160 ? c : null;
+    }
+
+    /** The owner, if alive and close enough to escort. */
+    @Nullable
+    protected Player ownerHere() {
+        Player o = owner();
+        return o != null && o.isAlive() && !o.isSpectator() && o.level() == level() && distanceToSqr(o) < 96 * 96 ? o : null;
+    }
+
+    private Vec3 postCentre() {
+        return guardPos != null ? Vec3.atBottomCenterOf(guardPos) : position();
+    }
+
+    /** Fight {@code e} for a while even if it isn't a monster (the owner's fight, or self-defence). */
+    public void command(LivingEntity e, int ticks) {
+        if (e == this || !Companions.fairGame(e, owner())) return;
+        if (commanded != e) retarget = 0;
+        commanded = e;
+        commandedUntil = tickCount + ticks;
+    }
+
+    /** Join the owner's fights: whatever they hit, and whatever hits them. */
+    private void listenToOwner(ServerLevel level) {
+        if (mode() == HeroMode.GUARD && core(level) != null) return;
+        Player o = ownerHere();
+        if (o == null || distanceToSqr(o) > 40 * 40) return;
+        LivingEntity by = Companions.struckBy(level, o, 100);
+        if (by != null && by != this && by.distanceToSqr(this) < 32 * 32) command(by, 240);
+        else {
+            LivingEntity hit = Companions.struck(level, o, 60);
+            if (hit != null && hit != this && hit.distanceToSqr(this) < 32 * 32) command(hit, 300);
+        }
     }
 
     public int heroLevel() {
@@ -379,6 +433,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
                 retreating = false;
             }
         }
+        if (tickCount % 5 == 0) listenToOwner(level);
         if (--retarget <= 0) {
             retarget = 10;
             LivingEntity t = pickTarget(level);
@@ -446,39 +501,54 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     }
 
     protected boolean validTarget(LivingEntity e) {
-        if (!e.isAlive() || e.isRemoved() || !SiegeDamage.isEnemy(e)) return false;
+        if (!e.isAlive() || e.isRemoved() || e.level() != level()) return false;
         if (e instanceof SiegeEnemy se && se.isUntargetable()) return false;
-        return distanceToSqr(e) < 48 * 48;
+        if (distanceToSqr(e) >= 48 * 48) return false;
+        if (e == commanded && tickCount < commandedUntil) return true;
+        return SiegeDamage.isEnemy(e) && !(e instanceof Player);
+    }
+
+    /** Neutral mobs (endermen, zombified piglins...) are left alone unless they're already fighting our side. */
+    private static boolean provoked(LivingEntity e) {
+        if (!(e instanceof net.minecraft.world.entity.NeutralMob)) return true;
+        return e instanceof Mob m && m.getTarget() != null && SiegeDamage.isDefender(m.getTarget());
     }
 
     @Nullable
     protected LivingEntity pickTarget(ServerLevel level) {
-        BlockPos core = SiegeManager.corePos(level);
-        Vec3 corePos = core != null ? Vec3.atCenterOf(core) : position();
-        Player owner = owner();
+        BlockPos core = core(level);
+        Vec3 corePos = core != null ? Vec3.atCenterOf(core) : postCentre();
+        Player owner = ownerHere();
         HeroMode m = mode();
-        if (m == HeroMode.FOLLOW && owner == null) m = HeroMode.GUARD;
+        if (m == HeroMode.FOLLOW && owner == null) m = core != null ? HeroMode.GUARD : HeroMode.HUNT;
+        if (commanded != null && tickCount < commandedUntil && validTarget(commanded)) return commanded;
+        commanded = null;
         Vec3 centre;
         double radius;
         switch (m) {
             case GUARD -> {
                 centre = corePos;
-                radius = 18;
+                radius = core != null ? 18 : 14;
             }
             case FOLLOW -> {
                 centre = owner.position();
                 radius = 14;
             }
             default -> {
-                centre = corePos;
-                radius = 48;
+                if (core != null) {
+                    centre = corePos;
+                    radius = 48;
+                } else {
+                    centre = owner != null ? owner.position() : postCentre();
+                    radius = 28;
+                }
             }
         }
         Role role = role();
         LivingEntity best = null;
         double bestScore = Double.MAX_VALUE;
         for (LivingEntity e : SiegeDamage.enemiesAround(level, centre, radius)) {
-            if (!validTarget(e)) continue;
+            if (!validTarget(e) || e instanceof Player || !provoked(e)) continue;
             double score;
             if (m == HeroMode.GUARD) {
                 score = e.position().distanceTo(corePos) + distanceTo(e) * 0.35;
@@ -587,8 +657,9 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
 
     /** Fall back toward the core / a Sanctum, still facing the enemy. */
     protected void fallBack(ServerLevel level) {
-        BlockPos core = SiegeManager.corePos(level);
-        Vec3 safe = core != null ? Vec3.atBottomCenterOf(core) : position();
+        BlockPos core = core(level);
+        Player owner = ownerHere();
+        Vec3 safe = core != null ? Vec3.atBottomCenterOf(core) : owner != null ? owner.position() : postCentre();
         for (LivingEntity a : SiegeDamage.defendersAround(level, position(), 24)) {
             if (a instanceof TurretEntity t && t.kind == com.lastbastion.entity.turret.TurretKind.SANCTUM) {
                 safe = t.position();
@@ -607,33 +678,45 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     }
 
     protected void idle(ServerLevel level) {
-        BlockPos core = SiegeManager.corePos(level);
-        Player owner = owner();
+        BlockPos core = core(level);
+        Player owner = ownerHere();
         Vec3 dest = null;
         double tolerance = 2.5;
-        switch (mode()) {
+        HeroMode m = mode();
+        if (m == HeroMode.FOLLOW && owner == null) m = core != null ? HeroMode.GUARD : HeroMode.HUNT;
+        switch (m) {
             case GUARD -> {
                 if (core != null) {
                     double r = 4 + getBbWidth();
                     dest = Vec3.atBottomCenterOf(core).add(Math.cos(postAngle) * r, 0, Math.sin(postAngle) * r);
+                } else if (guardPos != null) {
+                    dest = Vec3.atBottomCenterOf(guardPos);
+                    tolerance = 1.5 + getBbWidth();
                 }
             }
             case FOLLOW -> {
-                if (owner != null) {
-                    if (distanceToSqr(owner) > 28 * 28 && owner.level() == level()) {
-                        Vfx.spray(level, FxStyle.SMOKE, position().add(0, 1, 0), 0xB8B0A8, 0x8A8480, 0.7f, 10, 0.12f, 0);
-                        teleportTo(owner.getX() + random.nextGaussian(), owner.getY(), owner.getZ() + random.nextGaussian());
-                        Vfx.spray(level, FxStyle.STAR, position().add(0, 1, 0), 0xFFFFFF, kind.color, 0.25f, 12, 0.2f, 0);
-                    }
-                    dest = owner.position();
-                    tolerance = 3 + getBbWidth();
+                if (distanceToSqr(owner) > 28 * 28) {
+                    Vfx.spray(level, FxStyle.SMOKE, position().add(0, 1, 0), 0xB8B0A8, 0x8A8480, 0.7f, 10, 0.12f, 0);
+                    Vec3 to = Companions.safeSpotNear(level, this, owner.position());
+                    teleportTo(to.x, to.y, to.z);
+                    getNavigation().stop();
+                    Vfx.spray(level, FxStyle.STAR, position().add(0, 1, 0), 0xFFFFFF, kind.color, 0.25f, 12, 0.2f, 0);
                 }
+                // walk at the owner's side rather than on top of them
+                Vec3 side = Vec3.directionFromRotation(0, owner.getYRot() + (postAngle > Mth.PI ? 120 : -120)).scale(2 + getBbWidth());
+                dest = owner.position().add(side);
+                tolerance = 2 + getBbWidth();
             }
             case HUNT -> {
                 if (core != null) {
                     double a = postAngle + tickCount * 0.004;
                     dest = Vec3.atBottomCenterOf(core).add(Math.cos(a) * 20, 0, Math.sin(a) * 20);
                     tolerance = 4;
+                } else {
+                    Vec3 c = owner != null ? owner.position() : postCentre();
+                    double a = postAngle + tickCount * 0.006;
+                    dest = c.add(Math.cos(a) * 9, 0, Math.sin(a) * 9);
+                    tolerance = 3;
                 }
             }
         }
@@ -641,7 +724,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         if (position().distanceToSqr(dest) > tolerance * tolerance) {
             if (--repath <= 0) {
                 repath = 20;
-                getNavigation().moveTo(dest.x, dest.y, dest.z, 1.0);
+                double speed = m == HeroMode.FOLLOW && position().distanceToSqr(dest) > 100 ? 1.3 : 1.0;
+                getNavigation().moveTo(dest.x, dest.y, dest.z, speed);
             }
         } else {
             getNavigation().stop();
@@ -828,6 +912,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         if (r) {
             lastDamaged = tickCount;
             lastCombat = tickCount;
+            if (source.getEntity() instanceof LivingEntity att && att != this && !SiegeDamage.isEnemy(att)) command(att, 200);
             gainUlt(Math.min(amount, 20) * 0.2f);
             if (low && getHealth() <= getMaxHealth() * 0.3f) speak(Lines.LOW_HP, false);
         }
@@ -838,12 +923,11 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     public void die(DamageSource source) {
         super.die(source);
         if (level() instanceof ServerLevel sl && getOwnerId() != null) {
-            SiegeData d = SiegeManager.data(sl);
-            d.fallenHeroes.add(new SiegeData.FallenHero(getOwnerId(), kind.ordinal(), heroLevel(), xp()));
-            d.setDirty();
+            Companions.returnSigil(sl, this, true);
             if (owner() instanceof ServerPlayer sp) {
-                sp.displayClientMessage(Component.literal(kind.title + " has fallen! Revive them at the Siege Core.")
-                        .withStyle(ChatFormatting.RED), false);
+                int secs = Companions.recoveryTicks(kind) / 20;
+                sp.displayClientMessage(Component.literal(kind.title + " has fallen! Their " + (kind.devil ? "pact" : "sigil") + " returns to you and recovers in "
+                        + secs / 60 + ":" + String.format("%02d", secs % 60) + " (rush it at the Siege Core).").withStyle(ChatFormatting.RED), false);
             }
             Vfx.pillar(sl, position(), kind.color, getBbWidth() * 0.6f, 15, 30);
             Vfx.spray(sl, FxStyle.SOUL, position().add(0, getBbHeight() * 0.5, 0), 0xFFFFFF, kind.color, 0.4f, 16, 0.15f, 1);
@@ -884,6 +968,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         tag.putInt("lbLevel", heroLevel());
         tag.putInt("lbXp", xp());
         tag.putFloat("lbUlt", ultEnergy());
+        if (guardPos != null) tag.put("lbGuard", net.minecraft.nbt.NbtUtils.writeBlockPos(guardPos));
     }
 
     @Override
@@ -893,6 +978,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         entityData.set(MODE, tag.getInt("lbMode"));
         setLevelAndXp(Math.max(1, tag.getInt("lbLevel")), tag.getInt("lbXp"));
         entityData.set(ULT_ENERGY, tag.getFloat("lbUlt"));
+        if (tag.contains("lbGuard")) guardPos = net.minecraft.nbt.NbtUtils.readBlockPos(tag.getCompound("lbGuard"));
     }
 
     @Override
