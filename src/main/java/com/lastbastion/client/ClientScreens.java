@@ -31,6 +31,10 @@ public final class ClientScreens {
         }
     }
 
+    public static void codex() {
+        Minecraft.getInstance().setScreen(new com.lastbastion.client.screen.CodexScreen());
+    }
+
     public static void rules(com.lastbastion.network.RulesPacket p) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.screen instanceof com.lastbastion.client.screen.RulesScreen rs) {

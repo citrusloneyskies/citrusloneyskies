@@ -1182,10 +1182,14 @@ public class TurretEntity extends Mob implements SiegeAlly {
         if (rampTicks % 20 == 1) sound(sl, SoundEvents.BEACON_AMBIENT, 1f, 1.5f + ramp * 0.2f);
     }
 
+    /** Seraph's Sanctuary: ticks until it can raise another downed ally. */
+    private int sanctuaryReviveCd;
+
     private void sanctumAura(ServerLevel sl) {
         if (tickCount % 40 != 0) return;
         int lvl = turretLevel();
         boolean sanctuary = isB();
+        if (sanctuaryReviveCd > 0) sanctuaryReviveCd -= 40;
         double r = 8 + lvl + (sanctuary ? 3 : 0);
         float heal = (1f + lvl * 0.5f) * (sanctuary ? 2 : 1);
         Vfx.ring(sl, position().add(0, 0.05, 0), 0xFFE8A0, (float) r, 20, 0.3f);
@@ -1203,6 +1207,15 @@ public class TurretEntity extends Mob implements SiegeAlly {
             }
         }
         for (LivingEntity e : SiegeDamage.defendersAround(sl, position(), r)) {
+            if (sanctuary && sanctuaryReviveCd <= 0 && e instanceof net.minecraft.server.level.ServerPlayer sp
+                    && com.lastbastion.siege.raid.Downed.isDowned(sp)) {
+                com.lastbastion.siege.raid.Downed.revive(sp, null);
+                sanctuaryReviveCd = 600;
+                Vfx.beam(sl, position().add(0, getBbHeight() * 0.9, 0), sp.position().add(0, 1, 0), 0xFFE8A0, 0.25f, 16);
+                Vfx.spray(sl, FxStyle.FEATHER, sp.position().add(0, 1.2, 0), 0xFFFFFF, 0xFFE8A0, 0.25f, 16, 0.2f, 0.6f);
+                sl.playSound(null, sp.blockPosition(), net.minecraft.sounds.SoundEvents.BEACON_POWER_SELECT, net.minecraft.sounds.SoundSource.PLAYERS, 1.2f, 1.4f);
+                continue;
+            }
             if (e.getHealth() < e.getMaxHealth()) {
                 e.heal(heal);
                 Vfx.spray(sl, FxStyle.STAR, e.position().add(0, e.getBbHeight() * 0.6, 0), 0xFFFFFF, 0x9CFFB0, 0.15f, 4, 0.1f, 1);

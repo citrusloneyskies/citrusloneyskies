@@ -159,6 +159,7 @@ public class HellspawnEntity extends PathfinderMob implements SiegeAlly {
             return;
         }
         if (life < FADE_TICKS) entityData.set(FADE, life);
+        if (isNoAi()) return;
         if (attackCd > 0) attackCd--;
         if (specialCd > 0) specialCd--;
         Entity m = masterEntity(sl);

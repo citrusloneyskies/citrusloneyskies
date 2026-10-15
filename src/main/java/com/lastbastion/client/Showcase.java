@@ -62,7 +62,7 @@ public final class Showcase {
     private static final boolean ENABLED = System.getenv("LB_SHOWCASE") != null;
     private static int stage, ticks, shot;
     private static final int GROUND = -60;
-    static final double ZOMBIE_Z = 0, HERO_Z = 20, TURRET_Z = 40, BOSS_Z = 64, VFX_Z = -24, ARSENAL_Z = 100;
+    static final double ZOMBIE_Z = 0, HERO_Z = 20, TURRET_Z = 40, BOSS_Z = 64, VFX_Z = -24, ARSENAL_Z = 100, RAID_Z = 150;
 
     /** A photo: camera position and angles; {@code hotbar} >= 0 shows the GUI with that hotbar slot selected. */
     private record Shot(String name, Vec3 pos, float yaw, float pitch, int hotbar) {
@@ -95,28 +95,32 @@ public final class Showcase {
 
     private static void planShots() {
         SHOTS.clear();
-        int n = 1;
+        // stable names (category prefix, no running counter) so the README links survive new content
         double y = GROUND;
-        SHOTS.add(new Shot(String.format("%02d_vfx", n++), new Vec3(12, y + 6, VFX_Z - 15), 0, 16));
-        SHOTS.add(new Shot(String.format("%02d_core", n++), new Vec3(-10, y + 2.6, -7.2), 0, 8));
-        SHOTS.add(new Shot(String.format("%02d_core_close", n++), new Vec3(-10, y + 2.2, -3.4), 0, 4));
+        SHOTS.add(new Shot("00_vfx", new Vec3(12, y + 6, VFX_Z - 15), 0, 16));
+        SHOTS.add(new Shot("01_core", new Vec3(-10, y + 2.6, -7.2), 0, 8));
+        SHOTS.add(new Shot("02_core_close", new Vec3(-10, y + 2.2, -3.4), 0, 4));
+        // war events and hellspawn early, while the supply crate is still waiting to be claimed
+        SHOTS.add(new Shot("70_raid_events", new Vec3(6, y + 3.2, RAID_Z - 10.5), 0, 12));
+        SHOTS.add(new Shot("71_hellspawn", new Vec3(28.5, y + 2.2, RAID_Z - 7.5), 0, 10));
         ZombieKind[] zk = ZombieKind.values();
         for (int i = 0; i < zk.length; i++) {
             EntityDimensions d = zk[i].type().get().getDimensions();
             double h = d.height * 1.18;
             double dist = Math.max(4.2, h * 1.45 + 2.6);
-            SHOTS.add(new Shot(String.format("%02d_zombie_%s", n++, zk[i].id), new Vec3(zombieX(i) + 1.7, y + h * 0.55 + 0.35, ZOMBIE_Z - dist), 0, 10));
+            SHOTS.add(new Shot("10_zombie_" + zk[i].id, new Vec3(zombieX(i) + 1.7, y + h * 0.55 + 0.35, ZOMBIE_Z - dist), 0, 10));
         }
         HeroKind[] hk = HeroKind.values();
         for (int i = 0; i < hk.length; i++) {
             EntityDimensions d = hk[i].type().get().getDimensions();
             double dist = Math.max(3.4, d.height * 1.55 + d.width);
-            SHOTS.add(new Shot(String.format("%02d_hero_%s", n++, hk[i].name().toLowerCase()), new Vec3(heroX(i), y + d.height * 0.62 + 0.3, HERO_Z - dist), 0, 10));
+            String name = (hk[i].devil ? "25_devil_" : "20_hero_") + hk[i].name().toLowerCase();
+            SHOTS.add(new Shot(name, new Vec3(heroX(i), y + d.height * 0.62 + 0.3, HERO_Z - dist), 0, 10));
         }
         TurretKind[] tk = TurretKind.values();
         for (int i = 0; i < tk.length; i++) {
-            SHOTS.add(new Shot(String.format("%02d_turret_%s_1_3", n++, tk[i].id), new Vec3(turretX(i) + 1.2, y + 1.7, TURRET_Z - 3.6), 0, 14));
-            SHOTS.add(new Shot(String.format("%02d_turret_%s_5ab", n++, tk[i].id), new Vec3(turretX(i) + 6.45, y + 1.9, TURRET_Z - 4.0), 0, 12));
+            SHOTS.add(new Shot("30_turret_" + tk[i].id + "_1_3", new Vec3(turretX(i) + 1.2, y + 1.7, TURRET_Z - 3.6), 0, 14));
+            SHOTS.add(new Shot("30_turret_" + tk[i].id + "_5ab", new Vec3(turretX(i) + 6.45, y + 1.9, TURRET_Z - 4.0), 0, 12));
         }
         BossKind[] bk = BossKind.values();
         for (int i = 0; i < bk.length; i++) {
@@ -125,21 +129,21 @@ public final class Showcase {
             if (bk[i] == BossKind.MORVATHRAX || bk[i] == BossKind.PLAGUE_MOTHER) {
                 // three-quarter view from above so the body, legs and wings read
                 double dd = bk[i] == BossKind.MORVATHRAX ? 13 : 8;
-                SHOTS.add(new Shot(String.format("%02d_boss_%s", n++, bk[i].name().toLowerCase()),
+                SHOTS.add(new Shot("40_boss_" + bk[i].name().toLowerCase(),
                         new Vec3(bossX(i) + dd * 0.72, y + d.height + (bk[i] == BossKind.MORVATHRAX ? 5 : 2.5), BOSS_Z - dd * 0.72), 45, 24));
                 continue;
             }
-            SHOTS.add(new Shot(String.format("%02d_boss_%s", n++, bk[i].name().toLowerCase()), new Vec3(bossX(i), y + d.height * 0.6 + 0.5, BOSS_Z - dist), 0, 10));
+            SHOTS.add(new Shot("40_boss_" + bk[i].name().toLowerCase(), new Vec3(bossX(i), y + d.height * 0.6 + 0.5, BOSS_Z - dist), 0, 10));
         }
         // arsenal: weapon racks, the frame wall, armour sets front and back, and first-person views
-        SHOTS.add(new Shot(String.format("%02d_arsenal_melee", n++), new Vec3(10.5, y + 1.9, ARSENAL_Z - 5.2), 0, 12));
-        SHOTS.add(new Shot(String.format("%02d_arsenal_guns", n++), new Vec3(10.5, y + 1.9, ARSENAL_Z + 6 - 5.2), 0, 12));
-        SHOTS.add(new Shot(String.format("%02d_arsenal_frames", n++), new Vec3(10.5, y + 2.5, ARSENAL_Z + 14 - 6.5), 0, 4));
-        SHOTS.add(new Shot(String.format("%02d_armor_sets", n++), new Vec3(7.5, y + 1.4, ARSENAL_Z + 24 - 5.5), 0, 6));
-        SHOTS.add(new Shot(String.format("%02d_armor_sets_back", n++), new Vec3(7.5, y + 1.4, ARSENAL_Z + 24 + 5.5), 180, 6));
+        SHOTS.add(new Shot("50_arsenal_melee", new Vec3(10.5, y + 1.9, ARSENAL_Z - 5.2), 0, 12));
+        SHOTS.add(new Shot("50_arsenal_guns", new Vec3(10.5, y + 1.9, ARSENAL_Z + 6 - 5.2), 0, 12));
+        SHOTS.add(new Shot("50_arsenal_frames", new Vec3(10.5, y + 2.5, ARSENAL_Z + 14 - 6.5), 0, 4));
+        SHOTS.add(new Shot("51_armor_sets", new Vec3(7.5, y + 1.4, ARSENAL_Z + 24 - 5.5), 0, 6));
+        SHOTS.add(new Shot("51_armor_sets_back", new Vec3(7.5, y + 1.4, ARSENAL_Z + 24 + 5.5), 180, 6));
         int[] fp = {6, 7, 3, 0};
         for (int slot : fp) {
-            SHOTS.add(new Shot(String.format("%02d_firstperson_%d", n++, slot), new Vec3(-10, y, -14), 0, 4, slot));
+            SHOTS.add(new Shot("60_firstperson_" + slot, new Vec3(-10, y, -14), 0, 4, slot));
         }
     }
 
@@ -297,6 +301,33 @@ public final class Showcase {
         cd.shield = cd.maxShield();
         SiegeManager.syncHud(level, cd);
         buildArsenal(level);
+        buildRaid(level);
+    }
+
+    /** War events (a landed supply crate, a corruption rift, a warlord) and the devils' hellspawn. */
+    private static void buildRaid(ServerLevel level) {
+        var crate = com.lastbastion.registry.ModEntities.SUPPLY_CRATE.get().create(level);
+        if (crate != null) {
+            crate.moveTo(0, GROUND, RAID_Z, 160f, 0f);
+            level.addFreshEntity(crate);
+        }
+        var rift = com.lastbastion.registry.ModEntities.RIFT.get().create(level);
+        if (rift != null) pose(rift, level, 6, GROUND, RAID_Z, true);
+        SiegeZombie lord = ZombieSpawner.spawn(level, ZombieKind.BRUTE, ZombieRank.CORRUPTED, 0, new Vec3(12.5, GROUND, RAID_Z), false, false);
+        if (lord != null) {
+            lord.makeWarlord("Gravelord");
+            pose(lord, level, 12.5, GROUND, RAID_Z, false);
+        }
+        HeroEntity master = null;
+        for (Mob m : POSED) if (m instanceof HeroEntity h && h.kind == HeroKind.LUCIFER) master = h;
+        if (master != null) {
+            double[] xs = {24, 28.5, 33.5};
+            com.lastbastion.entity.hero.HellspawnEntity.Variant[] vs = com.lastbastion.entity.hero.HellspawnEntity.Variant.values();
+            for (int i = 0; i < vs.length; i++) {
+                var hs = com.lastbastion.entity.hero.HellspawnEntity.summon(level, master, vs[i], new Vec3(xs[i], GROUND, RAID_Z), 1_000_000);
+                if (hs != null) pose(hs, level, xs[i], GROUND, RAID_Z, false);
+            }
+        }
     }
 
     private static ArmorStand stand(ServerLevel level, double x, double z, float yaw, String pose) {

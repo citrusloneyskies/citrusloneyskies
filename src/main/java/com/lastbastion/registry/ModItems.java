@@ -72,6 +72,7 @@ public final class ModItems {
     }
 
     public static final RegistryObject<Item> WARFORGED_TOKEN = ITEMS.register("warforged_token", () -> new WarforgedTokenItem(new Item.Properties()));
+    public static final RegistryObject<Item> CODEX = ITEMS.register("siege_codex", () -> new com.lastbastion.item.CodexItem(new Item.Properties()));
 
     public static final RegistryObject<Item> BARRICADE_WOOD = block("barricade_wood", ModBlocks.BARRICADE_WOOD);
     public static final RegistryObject<Item> BARRICADE_STONE = block("barricade_stone", ModBlocks.BARRICADE_STONE);
