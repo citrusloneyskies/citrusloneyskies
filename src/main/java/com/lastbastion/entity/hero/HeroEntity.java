@@ -127,13 +127,16 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         xpReward = 0;
     }
 
+    /** Summons move well above their listed pace so they can keep up with a sprinting commander. */
+    public static final double SPEED_MULT = 1.3;
+
     public static AttributeSupplier.Builder createAttributes(HeroKind k) {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, k.hp)
                 .add(Attributes.ATTACK_DAMAGE, k.damage)
                 .add(Attributes.ARMOR, k.armor)
                 .add(Attributes.ARMOR_TOUGHNESS, k.armor / 3)
-                .add(Attributes.MOVEMENT_SPEED, k.speed)
+                .add(Attributes.MOVEMENT_SPEED, k.speed * SPEED_MULT)
                 .add(Attributes.KNOCKBACK_RESISTANCE, k.hp > 300 ? 0.9 : 0.5)
                 .add(Attributes.FOLLOW_RANGE, 64);
     }
@@ -410,7 +413,10 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             discard();
             return;
         }
-        int rate = cooldownRate();
+        tempoAcc += tempo();
+        int rate = (int) tempoAcc;
+        tempoAcc -= rate;
+        if (lungeCd > 0) lungeCd = Math.max(0, lungeCd - rate);
         for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i] = Math.max(0, cooldowns[i] - rate);
         if (attackCooldown > 0) attackCooldown = Math.max(0, attackCooldown - rate);
         if (dodgeCooldown > 0) dodgeCooldown--;
@@ -420,7 +426,11 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         passiveTick(level);
         if (skill == 0 && isNoGravity()) setNoGravity(false);
 
-        if (target != null && !validTarget(target)) target = null;
+        if (target != null && !validTarget(target)) {
+            // the foe fell: pick the next one at once instead of standing idle
+            target = null;
+            retarget = 0;
+        }
         entityData.set(COMBAT, target != null);
         if (target != null) lastCombat = tickCount;
 
@@ -453,7 +463,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         }
         if (tickCount % 5 == 0) listenToOwner(level);
         if (--retarget <= 0) {
-            retarget = 10;
+            retarget = 5;
             LivingEntity t = pickTarget(level);
             if (t != target && t instanceof SiegeEnemy se && se.isHighPriority() && (target == null || !(target instanceof SiegeEnemy o && o.isHighPriority()))) {
                 speak(Lines.BOSS, false);
@@ -682,7 +692,12 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             strafeDir = random.nextBoolean() ? 1 : -1;
         }
         if (isRanged()) {
-            if (dist < want * 0.55) {
+            if (!hasLineOfSight(t)) {
+                if (--repath <= 0) {
+                    repath = 6;
+                    getNavigation().moveTo(t, 1.35);
+                }
+            } else if (dist < want * 0.55) {
                 Vec3 away = position().subtract(t.position()).multiply(1, 0, 1).normalize().scale(5);
                 if (--repath <= 0) {
                     repath = 8;
@@ -700,15 +715,27 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
             }
             return;
         }
+        if (canLunge() && lungeCd <= 0 && onGround() && dist > range + 2.5 && dist < 11 && hasLineOfSight(t)) {
+            lunge(level, t);
+            return;
+        }
         if (dist > range + 0.4) {
             if (--repath <= 0) {
-                repath = 6;
-                getNavigation().moveTo(t, dist > 8 ? 1.25 : 1.1);
+                repath = 5;
+                double speed = dist > 8 ? 1.5 : 1.3;
+                if (dist > range + 4) {
+                    getNavigation().moveTo(t, speed);
+                } else {
+                    // close in from this summon's own side of the foe
+                    double a = flankAngle();
+                    double r = Math.max(0.6, range * 0.7);
+                    getNavigation().moveTo(t.getX() + Math.cos(a) * r, t.getY(), t.getZ() + Math.sin(a) * r, speed);
+                }
             }
         } else {
-            // in reach but waiting for the next swing: circle the target
+            // in reach between swings: weave in and out, never standing still
             getNavigation().stop();
-            getMoveControl().strafe(-0.1f, 0.3f * strafeDir);
+            getMoveControl().strafe(tickCount % 16 < 8 ? 0.2f : -0.25f, 0.45f * strafeDir);
             faceTowards(t.position());
         }
     }
@@ -949,9 +976,40 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         return 20;
     }
 
-    /** How many ticks of skill and attack cooldown recover per tick (devils fight at double tempo). */
-    protected int cooldownRate() {
-        return 1;
+    /** Ticks of skill/attack cooldown recovered per tick: heroes fight at 1.5x tempo, devils faster still. */
+    protected float tempo() {
+        return 1.5f;
+    }
+
+    private float tempoAcc;
+    private int lungeCd;
+
+    /** Melee summons leap at targets a few strides away instead of walking up to them. */
+    protected boolean canLunge() {
+        return !isRanged() && role() != Role.SUPPORT;
+    }
+
+    /** Each summon closes in from its own angle, so a pack surrounds a foe instead of queueing behind it. */
+    private double flankAngle() {
+        return (getId() * 2.39996) % (Math.PI * 2);
+    }
+
+    protected void lunge(ServerLevel level, LivingEntity t) {
+        lungeCd = 45 + random.nextInt(30);
+        Vec3 to = t.position().subtract(position());
+        double d = Math.max(0.1, to.horizontalDistance());
+        Vec3 dir = new Vec3(to.x / d, 0, to.z / d);
+        double power = Mth.clamp((d - attackRange()) / 6.0, 0.45, 1.5);
+        double up = 0.34 + Mth.clamp((t.getY() - getY()) * 0.1, 0, 0.25);
+        Vec3 from = position().add(0, getBbHeight() * 0.45, 0);
+        setDeltaMovement(dir.x * power, up, dir.z * power);
+        hasImpulse = true;
+        getNavigation().stop();
+        faceTowards(t.position());
+        attackCooldown = 0;
+        Vfx.dash(level, from, from.add(dir.scale(Math.min(d, 5))), kind.color, 0.45f, 8);
+        Vfx.spray(level, FxStyle.SMOKE, position().add(0, 0.1, 0), 0xB8B0A8, 0x8A8480, 0.5f, 6, 0.12f, -1);
+        level.playSound(null, blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_ATTACK_KNOCKBACK, net.minecraft.sounds.SoundSource.NEUTRAL, 0.7f, 0.8f + random.nextFloat() * 0.3f);
     }
 
     protected int comboLength() {

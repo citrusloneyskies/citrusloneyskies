@@ -73,6 +73,14 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     private int meleeCooldown;
     private int repath;
     private boolean coreSwing;
+    private float tempoAcc;
+    private int pounceCd = 60;
+    private int pounceTicks = -1;
+
+    /** Grounded bosses leap or charge at foes who keep their distance, and slam down on landing. */
+    protected boolean canPounce() {
+        return !isNoGravity();
+    }
     /** Stagger meter 0..100: heavy hits and shrugged-off crowd control fill it; full = stunned and vulnerable. */
     protected float stagger;
     private int staggerTicks;
@@ -354,12 +362,25 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
             introTick(level, introLength() - introTicks);
             return;
         }
-        for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
-        if (meleeCooldown > 0) meleeCooldown--;
+        // enraged bosses act faster: x1.5 below half health, x2 below a quarter
+        float hpFrac = getHealth() / getMaxHealth();
+        tempoAcc += 1f + (hpFrac < 0.5f ? 0.5f : 0f) + (hpFrac < 0.25f ? 0.5f : 0f);
+        int rate = (int) tempoAcc;
+        tempoAcc -= rate;
+        for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i] = Math.max(0, cooldowns[i] - rate);
+        if (meleeCooldown > 0) meleeCooldown = Math.max(0, meleeCooldown - rate);
+        if (pounceCd > 0) pounceCd = Math.max(0, pounceCd - rate);
         checkPhase(level);
         if (--retarget <= 0) {
-            retarget = 20;
+            retarget = 10;
             target = chooseTarget(level);
+            // whoever is hurting it most gets its attention
+            LivingEntity agg = getLastHurtByMob();
+            if (agg != null && agg != target && agg.isAlive() && tickCount - getLastHurtByMobTimestamp() < 60 && SiegeDamage.isDefender(agg)
+                    && !(agg instanceof Player p && (p.isCreative() || p.isSpectator())) && distanceTo(agg) < engageRange() * 1.5
+                    && (target == null || random.nextFloat() < 0.6f)) {
+                target = agg;
+            }
             setTarget(target);
         }
         if (target != null && (!target.isAlive() || (target instanceof Player p && (p.isCreative() || p.isSpectator())))) target = null;
@@ -432,6 +453,32 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
             reach += target.getBbWidth() * 0.5;
         }
         double dist = vsCore ? distCore : distTarget;
+        if (pounceTicks >= 0) {
+            pounceTicks++;
+            if (goal != null) getLookControl().setLookAt(goal.x, goal.y + 1, goal.z);
+            if ((onGround() && pounceTicks > 4) || pounceTicks > 40) {
+                pounceTicks = -1;
+                Vfx.ring(level, position().add(0, 0.1, 0), dangerColor(), (float) meleeReach() + 1.5f, 14, 0.5f);
+                Vfx.shake(level, position(), 0.4f, 10, 16);
+                meleeImpact(level);
+                meleeCooldown = Math.min(meleeCooldown, 10);
+            }
+            return;
+        }
+        if (!vsCore && canPounce() && pounceCd <= 0 && onGround() && meleeSwing < 0 && dist > reach + 3 && dist < 15 && hasLineOfSight(target)) {
+            pounceCd = 110 + random.nextInt(60);
+            pounceTicks = 0;
+            Vec3 to = goal.subtract(position());
+            double d = Math.max(0.1, to.horizontalDistance());
+            double power = net.minecraft.util.Mth.clamp((d - reach) / 7.5, 0.5, 1.8);
+            setDeltaMovement(to.x / d * power, 0.45, to.z / d * power);
+            hasImpulse = true;
+            getNavigation().stop();
+            anim.play(ANIM_MELEE);
+            Vfx.spray(level, FxStyle.SMOKE, position().add(0, 0.2, 0), 0x8A7A6A, 0x4A3A2A, 1f, 14, 0.25f, -1);
+            Fx.sound(level, position(), SoundEvents.RAVAGER_ROAR, 1.2f, 1.1f);
+            return;
+        }
         if (meleeSwing >= 0) {
             meleeSwing++;
             getLookControl().setLookAt(goal.x, goal.y + 1, goal.z);
@@ -456,7 +503,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
                 anim.play(vsCore ? ANIM_CORE : ANIM_MELEE);
             }
         } else if (--repath <= 0 || getNavigation().isDone()) {
-            repath = 15;
+            repath = 8;
             moveToward(goal, dist);
         }
     }
@@ -465,9 +512,9 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
         if (dist > 20) {
             Vec3 dir = goal.subtract(position()).multiply(1, 0, 1).normalize().scale(14);
             Vec3 p = position().add(dir);
-            getNavigation().moveTo(p.x, goal.y, p.z, 1.0);
+            getNavigation().moveTo(p.x, goal.y, p.z, 1.25);
         } else {
-            getNavigation().moveTo(goal.x, goal.y, goal.z, 1.0);
+            getNavigation().moveTo(goal.x, goal.y, goal.z, dist > 8 ? 1.35 : 1.2);
         }
     }
 
