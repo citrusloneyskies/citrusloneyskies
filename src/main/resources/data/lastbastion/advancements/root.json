@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "item": "lastbastion:siege_core"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.root.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.root.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false,
+    "background": "minecraft:textures/block/polished_blackstone_bricks.png"
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

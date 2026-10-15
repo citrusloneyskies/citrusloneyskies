@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:wave_10",
+  "display": {
+    "icon": {
+      "item": "lastbastion:sigil_zeus"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.wave_25.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.wave_25.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

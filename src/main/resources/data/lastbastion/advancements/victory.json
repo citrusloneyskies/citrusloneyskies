@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:wave_10",
+  "display": {
+    "icon": {
+      "item": "minecraft:nether_star"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.victory.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.victory.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

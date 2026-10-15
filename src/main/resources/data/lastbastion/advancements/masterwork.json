@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:root",
+  "display": {
+    "icon": {
+      "item": "lastbastion:dawnbreaker"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.masterwork.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.masterwork.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

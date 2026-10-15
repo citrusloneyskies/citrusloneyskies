@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:first_night",
+  "display": {
+    "icon": {
+      "item": "minecraft:totem_of_undying"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.not_today.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.not_today.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

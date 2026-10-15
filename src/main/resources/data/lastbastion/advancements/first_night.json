@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:root",
+  "display": {
+    "icon": {
+      "item": "lastbastion:turret_kit_ballista"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.first_night.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.first_night.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

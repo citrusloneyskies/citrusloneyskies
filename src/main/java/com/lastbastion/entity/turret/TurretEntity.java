@@ -369,6 +369,7 @@ public class TurretEntity extends Mob implements SiegeAlly {
         if (turretLevel() == 3) {
             by.displayClientMessage(Component.literal(kind.title + " unlocked: " + kind.perk3).withStyle(net.minecraft.ChatFormatting.GOLD), false);
         } else if (turretLevel() == 5) {
+            com.lastbastion.siege.Milestones.award(by, com.lastbastion.siege.Milestones.SPECIALIST);
             by.displayClientMessage(Component.literal(kind.title + " specialised: " + specialisation() + ". "
                     + (isB() ? kind.branchBDesc : kind.branchADesc)).withStyle(net.minecraft.ChatFormatting.LIGHT_PURPLE), false);
         }

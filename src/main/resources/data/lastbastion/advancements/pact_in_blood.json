@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:answer_the_call",
+  "display": {
+    "icon": {
+      "item": "lastbastion:pact_lucifer"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.pact_in_blood.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.pact_in_blood.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

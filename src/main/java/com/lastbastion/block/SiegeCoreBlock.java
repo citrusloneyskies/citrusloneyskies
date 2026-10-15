@@ -66,6 +66,7 @@ public class SiegeCoreBlock extends BaseEntityBlock {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (level instanceof ServerLevel sl) {
             Component err = SiegeManager.tryPlaceCore(sl, pos, placer instanceof ServerPlayer sp ? sp : null);
+            if (err == null && placer instanceof ServerPlayer owner) com.lastbastion.siege.Milestones.award(owner, com.lastbastion.siege.Milestones.ROOT);
             if (err == null && placer instanceof ServerPlayer sp && !sp.getInventory().contains(new ItemStack(ModItems.CODEX.get()))) {
                 // a first-time commander gets the manual
                 if (!sp.getInventory().add(new ItemStack(ModItems.CODEX.get()))) sp.drop(new ItemStack(ModItems.CODEX.get()), false);

@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:root",
+  "display": {
+    "icon": {
+      "item": "lastbastion:turret_kit_tesla"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.specialist.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.specialist.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

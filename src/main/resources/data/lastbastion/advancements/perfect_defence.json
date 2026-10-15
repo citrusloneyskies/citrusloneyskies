@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:first_night",
+  "display": {
+    "icon": {
+      "item": "minecraft:shield"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.perfect_defence.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.perfect_defence.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

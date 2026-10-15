@@ -1,0 +1,23 @@
+{
+  "parent": "lastbastion:first_night",
+  "display": {
+    "icon": {
+      "item": "lastbastion:warforged_token"
+    },
+    "title": {
+      "translate": "advancements.lastbastion.wave_10.title"
+    },
+    "description": {
+      "translate": "advancements.lastbastion.wave_10.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "earned": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}
