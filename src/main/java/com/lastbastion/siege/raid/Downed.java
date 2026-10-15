@@ -55,11 +55,15 @@ public final class Downed {
 
     static final class State {
         int bleed, maxBleed, revive, hitCooldown, alone;
+        /** Did the horde put this player down? Only then does picking them up pay a bounty. */
+        boolean bounty;
         @Nullable
         UUID reviver;
     }
 
     private static final Map<UUID, State> DOWNED = new HashMap<>();
+    /** Players whose rescue already paid out this wave: one bounty per downed player per wave, so it can't be farmed. */
+    private static final Set<UUID> PAID = new HashSet<>();
     /** Set while we kill a player on purpose, so our own death hook lets it through. */
     private static boolean executing;
 
@@ -90,7 +94,12 @@ public final class Downed {
         }
         if (!eligible(p)) return;
         e.setCanceled(true);
-        down(p);
+        down(p, byHorde(e.getSource()));
+    }
+
+    /** A blow from the horde (or its projectiles), as opposed to a fall, a teammate's stray shot or a lava dip. */
+    private static boolean byHorde(net.minecraft.world.damagesource.DamageSource src) {
+        return com.lastbastion.combat.SiegeDamage.isEnemy(src.getEntity()) || com.lastbastion.combat.SiegeDamage.isEnemy(src.getDirectEntity());
     }
 
     private static boolean eligible(ServerPlayer p) {
@@ -114,9 +123,14 @@ public final class Downed {
 
     /** Down a player (public for tests and commands). */
     public static void down(ServerPlayer p) {
+        down(p, true);
+    }
+
+    private static void down(ServerPlayer p, boolean bounty) {
         ServerLevel level = p.serverLevel();
         SiegeData d = SiegeManager.data(level);
         State s = new State();
+        s.bounty = bounty;
         s.maxBleed = s.bleed = d.rules.i(SiegeRules.BLEED_OUT) * 20;
         DOWNED.put(p.getUUID(), s);
         p.setHealth(1f);
@@ -207,6 +221,7 @@ public final class Downed {
 
     /** Stand a downed player back up ({@code by} = the reviver, or null at wave end). */
     public static void revive(ServerPlayer p, @Nullable ServerPlayer by) {
+        State was = DOWNED.get(p.getUUID());
         if (!clear(p, true)) return;
         ServerLevel level = p.serverLevel();
         p.setHealth(Math.max(p.getHealth(), p.getMaxHealth() * (by != null ? 0.35f : 0.5f)));
@@ -220,9 +235,9 @@ public final class Downed {
         if (by != null) {
             com.lastbastion.siege.Milestones.award(by, com.lastbastion.siege.Milestones.REVIVE);
             SiegeData d = SiegeManager.data(level);
-            int paid = SiegeManager.award(level, d, by.getUUID(), 20 + 2 * d.wave, by.position().add(0, 2, 0), false);
+            int paid = was.bounty && PAID.add(p.getUUID()) ? SiegeManager.award(level, d, by.getUUID(), 20 + 2 * d.wave, by.position().add(0, 2, 0), false) : 0;
             SiegeManager.broadcast(level, d, Component.literal("✚ " + by.getGameProfile().getName() + " revived " + p.getGameProfile().getName()
-                    + "! (+" + paid + " credits)").withStyle(ChatFormatting.GREEN));
+                    + (paid > 0 ? "! (+" + paid + " credits)" : "!")).withStyle(ChatFormatting.GREEN));
             by.displayClientMessage(Component.literal("Revived " + p.getGameProfile().getName() + "!").withStyle(ChatFormatting.GREEN), true);
         }
     }
@@ -250,9 +265,12 @@ public final class Downed {
         return true;
     }
 
-    /** Wave over (or the core fell): everyone gets back up. */
+    /** Wave over (or the core fell): everyone gets back up, and next wave's rescues pay again. */
     public static void reviveAll(ServerLevel level) {
-        for (ServerPlayer p : new ArrayList<>(level.players())) if (isDowned(p)) revive(p, null);
+        for (ServerPlayer p : new ArrayList<>(level.players())) {
+            if (isDowned(p)) revive(p, null);
+            PAID.remove(p.getUUID());
+        }
     }
 
     private static void sync(ServerPlayer p, State s) {
@@ -334,6 +352,7 @@ public final class Downed {
     /** Server stopping: forget everything (the crawl modifier is transient anyway). */
     public static void reset() {
         DOWNED.clear();
+        PAID.clear();
     }
 
     /** Players currently downed (for tests). */
