@@ -480,13 +480,23 @@ public final class SiegeManager {
         int cleared = d.wave;
         boolean perfect = !d.coreHit;
         float perfectMult = perfect ? 1f + d.rules.i(SiegeRules.PERFECT_BONUS) / 100f : 1f;
-        float bonusBase = (50 + 20 * cleared) * (d.calledEarly ? 1.25f : 1f) * perfectMult;
+        // Exponential-threat catch-up: scale the linear base by enemy toughness so economy tracks
+        // hpScale (= (1 + 0.07*(w-1)) * ENEMY_HEALTH). 0.5 + 0.5*hpScale is 1.0x at wave 1 and
+        // grows linearly (~2.37x at w40), keeping the perfect/early multipliers multiplicative
+        // so perfect (+50% default) is a modest absolute bump early but significant late.
+        float catchUp = 0.5f + 0.5f * WavePlanner.hpScale(d.rules, cleared);
+        float bonusBase = (50 + 20 * cleared) * catchUp * (d.calledEarly ? 1.25f : 1f) * perfectMult;
         boolean milestone = cleared % 10 == 0;
         int victoryWave = d.rules.i(SiegeRules.VICTORY_WAVE);
         boolean victory = victoryWave > 0 && cleared >= victoryWave && !d.victorious;
         List<ServerPlayer> players = playersNear(level, core, presenceRadius());
+        // Co-op split: total scales like the horde budget (1 + 0.5*(n-1)), divided equally.
+        // Solo (n=1): per-player == bonusBase (unchanged).
+        int n = Math.max(1, players.size());
+        float totalBonus = bonusBase * (1f + 0.5f * (n - 1));
+        float perPlayer = players.isEmpty() ? 0f : totalBonus / n;
         for (ServerPlayer p : players) {
-            int got = award(level, d, p.getUUID(), bonusBase, null, false);
+            int got = award(level, d, p.getUUID(), perPlayer, null, false);
             MutableComponent sub = Component.literal("+" + got + " credits").withStyle(ChatFormatting.YELLOW);
             if (perfect) sub = Component.literal("PERFECT DEFENCE   ").withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD).append(sub);
             if (victory) {
@@ -711,7 +721,7 @@ public final class SiegeManager {
 
     /** Apply all credit multipliers and pay the player. Returns the amount paid. */
     public static int award(ServerLevel level, SiegeData d, UUID player, float base, @Nullable Vec3 popupAt, boolean kill) {
-        float mult = d.rules.f(SiegeRules.CREDITS) * (1f + 0.1f * d.level(CoreUpgrade.TREASURY));
+        float mult = d.rules.f(SiegeRules.CREDITS) * (1f + 0.07f * d.level(CoreUpgrade.TREASURY));
         if (d.state == SiegeState.WAVE) mult *= d.modifier.creditMult;
         if (kill && popupAt != null && com.lastbastion.block.SupportBlock.harvesterNear(popupAt)) mult *= 1.25f;
         if (kill) mult *= com.lastbastion.item.armor.ArmorSets.creditMult(level.getPlayerByUUID(player));

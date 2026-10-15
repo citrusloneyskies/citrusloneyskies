@@ -7,9 +7,9 @@ package com.lastbastion.siege;
 public enum NightModifier {
     NONE("Clear Night", 0xBFC6D9, 1.0f, "An ordinary, dreadful night."),
     BLOOD_MOON("Blood Moon", 0xD01818, 1.5f, "Zombies move 20% faster and hit 25% harder."),
-    FOG("Graveyard Fog", 0x9AA6A6, 1.25f, "Turret range reduced by 25%. Zombies are hard to see."),
+    FOG("Graveyard Fog", 0x9AA6A6, 1.15f, "Turret range reduced by 25%. Zombies are hard to see."),
     STORM("Thunderstorm", 0xF4F06A, 1.2f, "Lightning strikes the battlefield. Tesla turrets +30% damage."),
-    HORDE("Horde Night", 0x7BD940, 1.2f, "60% more zombies, but they are less evolved."),
+    HORDE("Horde Night", 0x7BD940, 1.5f, "60% more zombies, but they are less evolved."),
     ELITE("Elite Vanguard", 0xFFB000, 1.4f, "Champion chance tripled."),
     NECROTIC("Necrotic Tide", 0x6B3FA0, 1.3f, "Fallen zombies have a 30% chance to rise again.");
 

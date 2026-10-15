@@ -61,9 +61,9 @@ public final class ArmorSets {
 
     // ------------------------------------------------------------------ hooks used by other systems
 
-    /** Credit multiplier for kills (Scavenger). */
+    /** Credit multiplier for kills (Scavenger). Stacks multiplicatively with Treasury/Harvester. */
     public static float creditMult(@Nullable Player p) {
-        return p != null && wearing(p, ArmorSet.SCAVENGER) ? 1.2f : 1f;
+        return p != null && wearing(p, ArmorSet.SCAVENGER) ? 1.12f : 1f;
     }
 
     /** Critical-hit damage multiplier for melee (Shadowstalker). */

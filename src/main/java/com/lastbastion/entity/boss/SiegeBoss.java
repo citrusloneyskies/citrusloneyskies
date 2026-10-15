@@ -63,6 +63,8 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
     public final AnimTracker anim;
     protected final ServerBossEvent bossBar;
     protected float damageScale = 1f;
+    /** Wave the boss spawned on; drives the credit bounty scaling (mirrors HP scaling). */
+    protected int wave = 5;
     protected int skill;
     protected int skillTick;
     protected final int[] cooldowns = new int[16];
@@ -122,6 +124,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
         float scale = (float) ((1 + 0.08 * Math.max(0, wave - 5)) * (1 + 0.6 * (players - 1)) * rules.get(com.lastbastion.siege.SiegeRules.BOSS_HEALTH));
         b.getAttribute(Attributes.MAX_HEALTH).setBaseValue(kind.hp * scale);
         b.damageScale = (float) ((1 + 0.03 * Math.max(0, wave - 5)) * rules.get(com.lastbastion.siege.SiegeRules.ENEMY_DAMAGE));
+        b.wave = Math.max(1, wave);
         b.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(kind.damage * b.damageScale);
         b.setHealth(b.getMaxHealth());
         b.finalizeSpawn(level, level.getCurrentDifficultyAt(b.blockPosition()), MobSpawnType.EVENT, null, null);
@@ -288,7 +291,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
 
     @Override
     public int creditValue() {
-        return kind.credits;
+        return Math.round(kind.credits * (1 + 0.08f * Math.max(0, wave - 5)));
     }
 
     @Override
@@ -763,12 +766,14 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
         super.addAdditionalSaveData(tag);
         tag.putFloat("lbDmgScale", damageScale);
         tag.putInt("lbPhase", phase());
+        tag.putInt("lbWave", wave);
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         damageScale = tag.contains("lbDmgScale") ? tag.getFloat("lbDmgScale") : 1f;
+        wave = tag.contains("lbWave") ? Math.max(1, tag.getInt("lbWave")) : 5;
         entityData.set(PHASE, Math.max(1, tag.getInt("lbPhase")));
         if (hasCustomName()) bossBar.setName(getDisplayName());
     }
