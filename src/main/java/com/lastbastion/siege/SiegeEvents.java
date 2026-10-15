@@ -39,6 +39,20 @@ public final class SiegeEvents {
         }
     }
 
+    /** Enemies and war-event entities that are destroyed (killed or discarded) stop counting at once. */
+    @SubscribeEvent
+    public static void onLeave(net.minecraftforge.event.entity.EntityLeaveLevelEvent e) {
+        if (!(e.getLevel() instanceof ServerLevel sl)) return;
+        net.minecraft.world.entity.Entity.RemovalReason why = e.getEntity().getRemovalReason();
+        if (why == null || !why.shouldDestroy()) return;
+        SiegeData d = SiegeManager.data(sl);
+        java.util.UUID id = e.getEntity().getUUID();
+        boolean changed = d.tracked.remove(id);
+        changed |= d.raidEntities.remove(id);
+        d.trackedSeen.remove(id);
+        if (changed) d.setDirty();
+    }
+
     /** The Titan Exosuit takes the hits for its pilot. */
     @SubscribeEvent
     public static void onHurt(LivingHurtEvent e) {

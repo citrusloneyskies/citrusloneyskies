@@ -648,6 +648,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
                 Vfx.spray(sl, FxStyle.SOUL, position().add(0, 1, 0), 0xFFFFFF, dangerColor(), 0.5f, 40, 0.3f, 1);
                 level().broadcastEntityEvent(this, (byte) 60);
                 com.lastbastion.siege.raid.RaidEvents.dropToken(sl, position().add(0, 1, 0), 1);
+                com.lastbastion.siege.Milestones.awardSiege(sl, com.lastbastion.siege.Milestones.BOSS);
                 remove(RemovalReason.KILLED);
             }
         }

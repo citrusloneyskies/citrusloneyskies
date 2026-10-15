@@ -127,47 +127,61 @@ public final class Companions {
     }
 
     /**
-     * Send a summon back to its sigil: into the owner's inventory if they're online, otherwise into the world's
-     * mailbox (delivered at their next login). {@code fallen} starts the recovery timer.
+     * Send a summon back to its sigil: into the owner's inventory if they're online and alive, otherwise into the
+     * world's mailbox (delivered at their next login or respawn). A fallen summon recovers fully; a dismissed one
+     * recovers for as much of its health as it was missing. Each summon returns its sigil at most once (dismissing
+     * a dying hero, or a defeat cleanup during its death throes, can't return a second one), and Kage's shadow
+     * clones never carry one.
      */
     public static void returnSigil(ServerLevel level, HeroEntity h, boolean fallen) {
         UUID owner = h.getOwnerId();
-        if (owner == null) return;
-        int total = fallen ? recoveryTicks(h.kind) : 0;
-        long until = fallen ? level.getGameTime() + total : 0;
+        if (owner == null || h instanceof KageCloneEntity || !h.claimSigilReturn()) return;
+        unbind(level, h);
+        int full = recoveryTicks(h.kind);
+        float missing = fallen ? 1f : 1f - Math.max(0f, Math.min(1f, h.getHealth() / Math.max(1f, h.getMaxHealth())));
+        int total = Math.round(full * missing);
+        if (total < 20 * 5) total = 0;
         ServerPlayer p = level.getServer().getPlayerList().getPlayer(owner);
-        if (p != null) {
-            ItemStack s = sigilFor(h.kind, h.heroLevel(), h.xp(), until, total);
+        if (p != null && p.isAlive()) {
+            ItemStack s = sigilFor(h.kind, h.heroLevel(), h.xp(), total > 0 ? level.getGameTime() + total : 0, total);
             if (!p.getInventory().add(s)) p.drop(s, false);
         } else {
             SiegeData d = SiegeManager.data(level);
-            d.fallenHeroes.add(new SiegeData.FallenHero(owner, h.kind.ordinal(), h.heroLevel(), h.xp()));
+            d.fallenHeroes.add(new SiegeData.FallenHero(owner, h.kind.ordinal(), h.heroLevel(), h.xp(), total));
             d.setDirty();
         }
     }
 
-    /** Hand over sigils waiting in the mailbox (fallen while offline, or from older saves). */
+    /** Hand over sigils waiting in the mailbox (returned while the owner was away or dead). */
     public static void deliverMail(ServerPlayer p) {
+        if (!p.isAlive()) return;
         SiegeData d = SiegeManager.data(p.serverLevel());
-        boolean any = false;
+        boolean any = false, recovering = false;
         for (Iterator<SiegeData.FallenHero> it = d.fallenHeroes.iterator(); it.hasNext(); ) {
             SiegeData.FallenHero f = it.next();
             if (!f.owner().equals(p.getUUID()) || f.heroKind() < 0 || f.heroKind() >= HeroKind.values().length) continue;
             HeroKind k = HeroKind.values()[f.heroKind()];
-            int total = recoveryTicks(k);
-            ItemStack s = sigilFor(k, f.level(), f.xp(), p.serverLevel().getGameTime() + total, total);
+            int total = f.recover() < 0 ? recoveryTicks(k) : f.recover();
+            ItemStack s = sigilFor(k, f.level(), f.xp(), total > 0 ? p.serverLevel().getGameTime() + total : 0, total);
             if (!p.getInventory().add(s)) p.drop(s, false);
             it.remove();
             any = true;
+            recovering |= total > 0;
         }
         if (any) {
             d.setDirty();
-            p.sendSystemMessage(Component.literal("Your fallen summons' sigils have returned to you. They are recovering.").withStyle(ChatFormatting.GOLD));
+            p.sendSystemMessage(Component.literal("Your summons' sigils have returned to you" + (recovering ? " (some are still recovering)." : "."))
+                    .withStyle(ChatFormatting.GOLD));
         }
     }
 
     @SubscribeEvent
     public static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
+        if (e.getEntity() instanceof ServerPlayer p) deliverMail(p);
+    }
+
+    @SubscribeEvent
+    public static void onRespawn(PlayerEvent.PlayerRespawnEvent e) {
         if (e.getEntity() instanceof ServerPlayer p) deliverMail(p);
     }
 
@@ -179,7 +193,63 @@ public final class Companions {
 
     // ------------------------------------------------------------------ limits
 
-    /** Heroes (not devils, not Kage's clones) this player currently has in the level. */
+    /** A pact or sigil left untended this long (a week of in-game days) lapses, so a lost summon can't block its owner forever. */
+    public static final long STALE_TICKS = 24000L * 7;
+
+    /** Record a freshly summoned hero or devil against its owner's limits. */
+    public static void bind(ServerLevel level, HeroEntity h) {
+        if (h.getOwnerId() == null || h instanceof KageCloneEntity) return;
+        SiegeData d = SiegeManager.data(level);
+        d.summons.put(h.getUUID(), new SiegeData.Summon(h.getOwnerId(), h.kind.ordinal(), level.getGameTime()));
+        d.setDirty();
+    }
+
+    public static void unbind(ServerLevel level, HeroEntity h) {
+        SiegeData d = SiegeManager.data(level);
+        if (d.summons.remove(h.getUUID()) != null) d.setDirty();
+    }
+
+    /** The kinds this player has bound anywhere (loaded or not), heroes or devils; lapsed entries are dropped. */
+    public static List<HeroKind> bound(ServerLevel level, UUID owner, boolean devils) {
+        SiegeData d = SiegeManager.data(level);
+        long now = level.getGameTime();
+        if (d.summons.values().removeIf(s -> now - s.lastSeen() > STALE_TICKS)) d.setDirty();
+        List<HeroKind> out = new ArrayList<>();
+        for (SiegeData.Summon s : d.summons.values()) {
+            if (!s.owner().equals(owner) || s.kind() < 0 || s.kind() >= HeroKind.values().length) continue;
+            HeroKind k = HeroKind.values()[s.kind()];
+            if (k.devil == devils) out.add(k);
+        }
+        return out;
+    }
+
+    public static int limit(boolean devils) {
+        return devils ? 1 : com.lastbastion.config.SiegeConfig.MAX_HEROES.get();
+    }
+
+    /**
+     * Called by every summon every few seconds: keeps its record fresh. A summon with no record (from an older save,
+     * or one whose pact lapsed while it sat unloaded) is re-registered if its owner has room, and otherwise must
+     * leave: returns false.
+     */
+    public static boolean touch(ServerLevel level, HeroEntity h) {
+        UUID owner = h.getOwnerId();
+        if (owner == null || h instanceof KageCloneEntity) return true;
+        SiegeData d = SiegeManager.data(level);
+        SiegeData.Summon s = d.summons.get(h.getUUID());
+        if (s != null) {
+            d.summons.put(h.getUUID(), new SiegeData.Summon(s.owner(), s.kind(), level.getGameTime()));
+            d.setDirty();
+            return true;
+        }
+        if (bound(level, owner, h.kind.devil).size() < limit(h.kind.devil)) {
+            bind(level, h);
+            return true;
+        }
+        return false;
+    }
+
+    /** Heroes (not devils, not Kage's clones) this player currently has loaded in the level. */
     public static List<HeroEntity> owned(ServerLevel level, UUID owner, boolean devils) {
         List<HeroEntity> out = new ArrayList<>();
         for (Entity e : level.getAllEntities()) {
@@ -188,7 +258,7 @@ public final class Companions {
         return out;
     }
 
-    /** Like {@link #owned} but across every dimension (summon limits can't be dodged through a portal). */
+    /** Like {@link #owned} but across every loaded dimension. */
     public static List<HeroEntity> ownedAnywhere(net.minecraft.server.MinecraftServer server, UUID owner, boolean devils) {
         List<HeroEntity> out = new ArrayList<>();
         for (ServerLevel l : server.getAllLevels()) out.addAll(owned(l, owner, devils));

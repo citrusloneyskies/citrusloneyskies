@@ -134,10 +134,7 @@ public final class RaidEvents {
             d.setDirty();
         }
         if (d.waveTick % 20 == 0 && !d.raidEntities.isEmpty()) {
-            if (d.raidEntities.removeIf(id -> {
-                Entity e = level.getEntity(id);
-                return e == null || !e.isAlive();
-            })) d.setDirty();
+            if (d.raidEntities.removeIf(id -> SiegeManager.gone(level, d, id))) d.setDirty();
         }
     }
 
@@ -255,6 +252,7 @@ public final class RaidEvents {
     /** A Warlord fell: drop its Warforged Token and tell everyone who did it. */
     public static void onWarlordSlain(ServerLevel level, SiegeZombie lord, DamageSource source) {
         Vec3 at = lord.position();
+        com.lastbastion.siege.Milestones.awardSiege(level, com.lastbastion.siege.Milestones.WARLORD);
         dropToken(level, at.add(0, 0.6, 0), 1);
         Vfx.pillar(level, at, Kind.WARLORD.color, 1.2f, 30, 40);
         Vfx.ring(level, at.add(0, 0.1, 0), Kind.WARLORD.color, 6, 18, 1);

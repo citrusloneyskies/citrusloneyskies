@@ -182,6 +182,7 @@ public class RiftEntity extends Monster implements SiegeEnemy {
             sl.playSound(null, getX(), getY(), getZ(), SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.HOSTILE, 2f, 0.5f);
             sl.playSound(null, getX(), getY(), getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.4f, 0.7f);
             Entity killer = source.getEntity();
+            com.lastbastion.siege.Milestones.awardSiege(sl, com.lastbastion.siege.Milestones.RIFT);
             SiegeManager.broadcast(sl, SiegeManager.data(sl), Component.literal("✦ The Corruption Rift collapses"
                     + (killer != null ? " (" + killer.getDisplayName().getString() + ")" : "") + ".").withStyle(ChatFormatting.LIGHT_PURPLE));
         }

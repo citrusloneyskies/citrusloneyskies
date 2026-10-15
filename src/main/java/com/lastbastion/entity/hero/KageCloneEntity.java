@@ -75,4 +75,10 @@ public class KageCloneEntity extends KageHero {
     public boolean shouldBeSaved() {
         return false;
     }
+
+    /** Shadows take no orders: no command screen, no dismissal for a sigil. */
+    @Override
+    protected net.minecraft.world.InteractionResult mobInteract(net.minecraft.world.entity.player.Player player, net.minecraft.world.InteractionHand hand) {
+        return net.minecraft.world.InteractionResult.PASS;
+    }
 }

@@ -62,9 +62,10 @@ public class HeroSigilItem extends Item {
             player.displayClientMessage(Component.literal("This server only allows summoning near an active Siege Core.").withStyle(ChatFormatting.RED), true);
             return InteractionResultHolder.fail(stack);
         }
-        var mine = com.lastbastion.entity.hero.Companions.ownedAnywhere(sl.getServer(), player.getUUID(), kind.devil);
+        // limits count every summon you have out, loaded or not (a devil left in a far-off chunk still holds your soul)
+        var mine = com.lastbastion.entity.hero.Companions.bound(sl, player.getUUID(), kind.devil);
         if (kind.devil && !mine.isEmpty()) {
-            player.displayClientMessage(Component.literal("You are already bound to " + mine.get(0).kind.shortName() + ". A soul can carry only one pact.")
+            player.displayClientMessage(Component.literal("You are already bound to " + mine.get(0).shortName() + ". A soul can carry only one pact.")
                     .withStyle(ChatFormatting.DARK_RED), true);
             return InteractionResultHolder.fail(stack);
         }
@@ -93,8 +94,13 @@ public class HeroSigilItem extends Item {
             sl.playSound(null, player.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1f, 0.6f);
         }
         sl.addFreshEntity(hero);
+        com.lastbastion.entity.hero.Companions.bind(sl, hero);
         arrival(sl, hero);
         hero.onSummoned(sl);
+        if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            com.lastbastion.siege.Milestones.award(sp, kind.devil ? com.lastbastion.siege.Milestones.DEVIL : com.lastbastion.siege.Milestones.HERO);
+            if (!kind.devil && mine.size() + 1 >= 6) com.lastbastion.siege.Milestones.award(sp, com.lastbastion.siege.Milestones.LEGION);
+        }
         if (!player.getAbilities().instabuild) stack.shrink(1);
         String verb = kind.devil ? " is bound to you by blood!" : " answers your call!";
         String where = nearCore ? " (guarding the core)" : " (following you)";

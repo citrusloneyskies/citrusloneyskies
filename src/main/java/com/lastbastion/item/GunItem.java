@@ -294,7 +294,7 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
             Vfx.jet(sl, FxStyle.FLAME, m, m.add(look.scale(7.5)), 0xFFE070, 0xFF3A08, 0.55f, 6, 14);
             if (used % 4 == 0) Vfx.jet(sl, FxStyle.SMOKE, m.add(look.scale(2)), m.add(look.scale(8.5)), 0x6A6260, 0x2A2826, 0.8f, 2, 16);
             for (LivingEntity e : SiegeDamage.enemiesAround(sl, m.add(look.scale(3.5)), 4.5)) {
-                if (e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(m).normalize().dot(look) < 0.8) continue;
+                if (e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(m).normalize().dot(look) < 0.8 || !reach(sl, user, m, e)) continue;
                 SiegeDamage.deal(e, user, user, dmg(stack), Element.FIRE, false);
                 e.setSecondsOnFire(4);
                 if (sl.random.nextInt(4) == 0) SiegeDamage.applyStacking(e, ModEffects.SCORCHED.get(), 60, 1);
@@ -317,12 +317,16 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         Vec3 from = user.getEyePosition().add(0, -0.1, 0);
         Vec3 dir = user.getLookAngle();
         double width2 = over ? 5.0 : 1.5;
-        Vec3 end = from.add(dir.scale(64));
+        // the slug pierces every enemy in its path, but not the wall that stops it
+        net.minecraft.world.phys.HitResult wall = sl.clip(new net.minecraft.world.level.ClipContext(from, from.add(dir.scale(64)),
+                net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, user));
+        double range = wall.getType() == net.minecraft.world.phys.HitResult.Type.MISS ? 64 : wall.getLocation().distanceTo(from);
+        Vec3 end = from.add(dir.scale(range));
         Set<LivingEntity> hit = new HashSet<>();
-        for (LivingEntity e : SiegeDamage.enemiesAround(sl, from.add(dir.scale(32)), 33)) {
+        for (LivingEntity e : SiegeDamage.enemiesAround(sl, from.add(dir.scale(range / 2)), range / 2 + 1)) {
             Vec3 rel = e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(from);
             double along = rel.dot(dir);
-            if (along < 0 || rel.subtract(dir.scale(along)).lengthSqr() > width2) continue;
+            if (along < 0 || along > range + e.getBbWidth() * 0.5 || rel.subtract(dir.scale(along)).lengthSqr() > width2) continue;
             hit.add(e);
         }
         float d = dmg(stack) * (over ? 3f : 1f);
@@ -377,7 +381,8 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
                     LivingEntity cur = first;
                     for (int i = 0; i < 4; i++) {
                         LivingEntity c = cur;
-                        LivingEntity next = SiegeDamage.enemiesAround(sl, cur.position(), 6).stream().filter(e -> !hit.contains(e))
+                        Vec3 from = c.position().add(0, c.getBbHeight() * 0.5, 0);
+                        LivingEntity next = SiegeDamage.enemiesAround(sl, cur.position(), 6).stream().filter(e -> !hit.contains(e) && reach(sl, p, from, e))
                                 .min(Comparator.comparingDouble(e -> e.distanceToSqr(c))).orElse(null);
                         if (next == null) break;
                         com.lastbastion.combat.Fx.bolt(sl, cur.position().add(0, cur.getBbHeight() * 0.5, 0),
@@ -461,7 +466,7 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
                 Vfx.wave(sl, p.position(), p.position().add(new Vec3(look.x, 0, look.z).normalize().scale(6)), 0xF4F06A, 3.5f, 1.8f, 10);
                 for (LivingEntity e : SiegeDamage.enemiesAround(sl, p.position().add(look.scale(3)), 4.5)) {
                     Vec3 rel = e.position().subtract(p.position());
-                    if (rel.normalize().dot(look) < 0.5) continue;
+                    if (rel.normalize().dot(look) < 0.5 || !reach(sl, p, m, e)) continue;
                     SiegeDamage.deal(e, p, p, dmg(stack) * 1.5f, Element.LIGHTNING, false);
                     SiegeDamage.push(e, p.position(), 1.4, 0.4);
                     SiegeDamage.apply(e, ModEffects.SHOCKED.get(), 40, 0);
@@ -476,7 +481,7 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
                 Vfx.jet(sl, FxStyle.FLAKE, m, m.add(look.scale(6)), 0xFFFFFF, 0x9FEAFF, 0.4f, 30, 30);
                 Vfx.jet(sl, FxStyle.SHARD, m, m.add(look.scale(5)), 0xE8FAFF, 0x9FEAFF, 0.2f, 14, 25);
                 for (LivingEntity e : SiegeDamage.enemiesAround(sl, m.add(look.scale(3)), 4)) {
-                    if (e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(m).normalize().dot(look) < 0.65) continue;
+                    if (e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(m).normalize().dot(look) < 0.65 || !reach(sl, p, m, e)) continue;
                     SiegeDamage.deal(e, p, p, dmg(stack) * 0.5f, Element.ICE, false);
                     SiegeDamage.apply(e, ModEffects.FROZEN.get(), 50, 0);
                 }
@@ -512,13 +517,19 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         p.getCooldowns().addCooldown(this, 160);
     }
 
-    /** Enemies along a ray within {@code width} blocks, nearest first. */
+    /** Can a cone, beam or chain from {@code from} reach {@code e} without passing through a block? */
+    static boolean reach(ServerLevel sl, Entity shooter, Vec3 from, LivingEntity e) {
+        return com.lastbastion.item.weapon.MeleeCombat.sight(sl, shooter, from, e.position().add(0, e.getBbHeight() * 0.5, 0));
+    }
+
+    /** Enemies along a ray within {@code width} blocks and in sight, nearest first. */
     static List<LivingEntity> lineTargets(ServerLevel sl, Entity shooter, Vec3 from, Vec3 dir, double range, double width) {
         List<LivingEntity> out = new ArrayList<>();
         for (LivingEntity e : SiegeDamage.enemiesAround(sl, from.add(dir.scale(range / 2)), range / 2 + 2)) {
             Vec3 rel = e.position().add(0, e.getBbHeight() * 0.5, 0).subtract(from);
             double along = rel.dot(dir);
             if (along < 0 || along > range || rel.subtract(dir.scale(along)).length() > width + e.getBbWidth() * 0.5) continue;
+            if (!reach(sl, shooter, from, e)) continue;
             out.add(e);
         }
         out.sort(Comparator.comparingDouble(e -> e.distanceToSqr(shooter)));

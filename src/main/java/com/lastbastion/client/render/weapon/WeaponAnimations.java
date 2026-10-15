@@ -4,6 +4,7 @@ import com.lastbastion.LastBastion;
 import com.lastbastion.entity.misc.TitanExoEntity;
 import com.lastbastion.item.weapon.MeleeWeaponItem;
 import com.lastbastion.item.weapon.SwingStyle;
+import com.lastbastion.item.weapon.MeleeCombat;
 import com.lastbastion.item.weapon.WeaponKind;
 import com.lastbastion.network.Net;
 import com.lastbastion.network.WeaponAnimPacket;
@@ -46,6 +47,8 @@ public final class WeaponAnimations {
     private static int ticks;
     private static int lastSent = -100;
     private static int localStep = -1;
+    @Nullable
+    private static WeaponKind localKind;
     private static long localLast = -1000;
     private static net.minecraft.world.item.Item lastItem;
     private static int lastChange = -100;
@@ -72,7 +75,9 @@ public final class WeaponAnimations {
     public static void onPacket(WeaponAnimPacket p) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null && p.entity() == mc.player.getId()) {
-            localStep = p.step();
+            // follow the server's combo, but only from real combo strokes (weak swings don't advance it)
+            WeaponKind wk = WeaponKind.byId(p.weapon());
+            if (wk == localKind && p.step() >= 0 && p.step() < wk.combo.length && wk.combo[p.step()].ordinal() == p.style()) localStep = p.step();
             Anim cur = ANIMS.get(p.entity());
             if (cur != null && ticks - cur.start() < 8 && cur.style().ordinal() == p.style()) return;
         }
@@ -109,16 +114,23 @@ public final class WeaponAnimations {
     }
 
     static void trySwing(LocalPlayer p, WeaponKind k) {
-        if (p.isUsingItem() || ticks - lastSent < 3 || com.lastbastion.client.ClientDowned.isDowned(p)) return;
+        if (p.isUsingItem() || com.lastbastion.client.ClientDowned.isDowned(p)) return;
+        if (localKind != k) {
+            // a different weapon starts its own combo (mirrors MeleeCombat.swing)
+            localKind = k;
+            localStep = -1;
+        }
+        // the server allows at most two weak swings per full swing; don't predict swings it would refuse
+        if (ticks - lastSent < Math.max(3, Math.round(20f / k.attacksPerSecond) / 2)) return;
         lastSent = ticks;
         float strength = p.getAttackStrengthScale(0.5f);
         boolean strong = strength > 0.7f;
         long now = p.level().getGameTime();
         int window = Math.max(30, k.swingTicks() * 3);
-        int step = strong ? (now - localLast <= window ? (localStep + 1) % k.combo.length : 0) : Math.max(0, localStep);
-        localStep = step;
+        int step = MeleeCombat.comboStep(k, strong, localStep, now - localLast <= window);
+        if (strong) localStep = step;
         localLast = now;
-        play(p.getId(), k, k.combo[step], step, Mth.clamp(Math.round(k.swingTicks() * 0.85f), 6, 16));
+        play(p.getId(), k, strong ? k.combo[step] : MeleeCombat.weakStyle(k), step, Mth.clamp(Math.round(k.swingTicks() * 0.85f), 6, 16));
         p.resetAttackStrengthTicker();
         Net.toServer(new WeaponSwingPacket(0));
     }

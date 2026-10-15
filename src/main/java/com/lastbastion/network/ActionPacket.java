@@ -79,7 +79,12 @@ public record ActionPacket(int action, int target, String id) {
             }
             case HERO_MODE, HERO_DISMISS -> {
                 Entity e = level.getEntity(target);
-                if (!(e instanceof HeroEntity h) || !p.getUUID().equals(h.getOwnerId())) return;
+                if (!(e instanceof HeroEntity h) || !h.isAlive() || !p.getUUID().equals(h.getOwnerId())) return;
+                if (h instanceof com.lastbastion.entity.hero.KageCloneEntity) {
+                    // a shadow clone has no sigil to return: dismissing it just lets it fade
+                    if (action == HERO_DISMISS) h.discard();
+                    return;
+                }
                 if (action == HERO_DISMISS) {
                     com.lastbastion.entity.hero.Companions.returnSigil(level, h, false);
                     level.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF, h.getX(), h.getY() + 1, h.getZ(), 20, 0.4, 0.6, 0.4, 0.02);

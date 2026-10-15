@@ -328,13 +328,21 @@ public final class SiegeManager {
         int maxAlive = d.rules.i(SiegeRules.MAX_ALIVE);
         while (!d.queue.isEmpty() && d.queue.get(0).tick <= d.waveTick && d.tracked.size() < maxAlive) {
             WavePlanner.Group g = d.queue.remove(0);
-            spawnGroup(level, d, core, g);
+            if (!spawnGroup(level, d, core, g)) {
+                // nowhere to put them: try again shortly instead of letting the wave end with nobody in it
+                WavePlanner.Group retry = new WavePlanner.Group(d.waveTick + 60, g.angle + 1.3f, g.units);
+                int at = 0;
+                while (at < d.queue.size() && d.queue.get(at).tick <= retry.tick) at++;
+                d.queue.add(at, retry);
+                if (d.spawnStalls++ % 12 == 0) {
+                    broadcast(level, d, Component.literal("\u26a0 The horde can't find open ground anywhere near the core. "
+                            + "Clear some space around it - the wave won't end until they arrive.").withStyle(ChatFormatting.GOLD));
+                }
+                break;
+            }
         }
         if (d.waveTick % 20 == 0) {
-            d.tracked.removeIf(id -> {
-                Entity e = level.getEntity(id);
-                return e == null || !e.isAlive();
-            });
+            d.tracked.removeIf(id -> gone(level, d, id));
             d.bossAlive = d.tracked.stream().map(level::getEntity).anyMatch(e -> e instanceof SiegeBoss);
             if (d.queue.isEmpty() && d.tracked.isEmpty()) {
                 completeWave(level, d, core);
@@ -359,6 +367,28 @@ public final class SiegeManager {
         }
     }
 
+    /**
+     * Has this tracked entity really left the siege? Dead ones have; ones that simply aren't loaded (their chunk
+     * unloaded, or they're still loading after a restart) only count as gone after a minute unseen.
+     */
+    public static boolean gone(ServerLevel level, SiegeData d, UUID id) {
+        Entity e = level.getEntity(id);
+        if (e != null) {
+            if (!e.isAlive()) {
+                d.trackedSeen.remove(id);
+                return true;
+            }
+            d.trackedSeen.put(id, d.waveTick);
+            return false;
+        }
+        int seen = d.trackedSeen.computeIfAbsent(id, k -> d.waveTick);
+        if (d.waveTick - seen > 1200) {
+            d.trackedSeen.remove(id);
+            return true;
+        }
+        return false;
+    }
+
     private static void stormStrike(ServerLevel level, SiegeData d) {
         List<UUID> ids = new ArrayList<>(d.tracked);
         if (ids.isEmpty()) return;
@@ -370,8 +400,10 @@ public final class SiegeManager {
         SiegeDamage.areaDamage(level, p, 3, 12 * WavePlanner.damageScale(d.rules, d.wave), Element.LIGHTNING, null, null, true);
     }
 
-    private static void spawnGroup(ServerLevel level, SiegeData d, BlockPos core, WavePlanner.Group g) {
+    /** Spawn a group. Returns false if none of it could be placed (the caller re-queues it). */
+    private static boolean spawnGroup(ServerLevel level, SiegeData d, BlockPos core, WavePlanner.Group g) {
         int radius = d.rules.i(SiegeRules.SPAWN_RADIUS);
+        int placed = 0;
         float hp = WavePlanner.hpScale(d.rules, d.wave), dmg = WavePlanner.damageScale(d.rules, d.wave);
         if (d.modifier == NightModifier.BLOOD_MOON) dmg *= 1.25f;
         for (WavePlanner.Unit u : g.units) {
@@ -387,9 +419,14 @@ public final class SiegeManager {
             } else {
                 spawned = ZombieSpawner.spawn(level, ZombieKind.values()[u.kind()], ZombieRank.byId(u.rank()), u.affixes(), pos, true, true, hp, dmg);
             }
-            if (spawned != null) d.tracked.add(spawned.getUUID());
+            if (spawned != null) {
+                d.tracked.add(spawned.getUUID());
+                d.trackedSeen.put(spawned.getUUID(), d.waveTick);
+                placed++;
+            }
         }
         d.setDirty();
+        return placed > 0 || g.units.isEmpty();
     }
 
     private static void announceBoss(ServerLevel level, BlockPos core, BossKind bk) {
@@ -416,6 +453,23 @@ public final class SiegeManager {
                 if (!level.getFluidState(p.below()).isEmpty() && attempt < 3) continue;
                 if (level.getBlockState(p).isAir() && level.getBlockState(p.above()).isAir()) {
                     return new Vec3(x + 0.5, y, z + 0.5);
+                }
+            }
+        }
+        // no open surface within reach of the core's height (a bunker, a sky fortress, the Nether's roof):
+        // look for standing room around the core's own level instead
+        for (int r = Math.min(radius, 32); r >= 8; r -= 4) {
+            for (int attempt = 0; attempt < 6; attempt++) {
+                double a = angle + (level.random.nextDouble() - 0.5) * 1.6;
+                int x = core.getX() + (int) Math.round(Math.cos(a) * r);
+                int z = core.getZ() + (int) Math.round(Math.sin(a) * r);
+                if (!level.isLoaded(new BlockPos(x, core.getY(), z))) continue;
+                for (int dy = 6; dy >= -6; dy--) {
+                    BlockPos p = new BlockPos(x, core.getY() + dy, z);
+                    if (level.getBlockState(p).isAir() && level.getBlockState(p.above()).isAir()
+                            && level.getBlockState(p.below()).isFaceSturdy(level, p.below(), net.minecraft.core.Direction.UP)) {
+                        return new Vec3(x + 0.5, p.getY(), z + 0.5);
+                    }
                 }
             }
         }
@@ -449,6 +503,7 @@ public final class SiegeManager {
                 if (!p.getInventory().add(t)) p.drop(t, false);
             }
         }
+        Milestones.waveCleared(players, cleared, perfect, victory);
         if (perfect) broadcast(level, d, Component.literal("\u2726 Perfect defence! The core's hull was never touched (+"
                 + d.rules.i(SiegeRules.PERFECT_BONUS) + "% wave bonus).").withStyle(ChatFormatting.AQUA));
         if (milestone && !victory) {

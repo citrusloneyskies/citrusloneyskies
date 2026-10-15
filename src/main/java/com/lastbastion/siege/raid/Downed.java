@@ -218,6 +218,7 @@ public final class Downed {
         Vfx.spray(level, FxStyle.STAR, at.add(0, 1, 0), 0xFFFFFF, 0xFFE070, 0.25f, 18, 0.25f, 0.8f);
         level.playSound(null, at.x, at.y, at.z, SoundEvents.TOTEM_USE, SoundSource.PLAYERS, 0.7f, 1.3f);
         if (by != null) {
+            com.lastbastion.siege.Milestones.award(by, com.lastbastion.siege.Milestones.REVIVE);
             SiegeData d = SiegeManager.data(level);
             int paid = SiegeManager.award(level, d, by.getUUID(), 20 + 2 * d.wave, by.position().add(0, 2, 0), false);
             SiegeManager.broadcast(level, d, Component.literal("✚ " + by.getGameProfile().getName() + " revived " + p.getGameProfile().getName()

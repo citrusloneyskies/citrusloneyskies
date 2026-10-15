@@ -23,6 +23,7 @@ public class LastBastion {
 
     public LastBastion() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
+        AttributeCaps.raise();
         ModBlocks.BLOCKS.register(bus);
         ModItems.ITEMS.register(bus);
         ModBlockEntities.BLOCK_ENTITIES.register(bus);

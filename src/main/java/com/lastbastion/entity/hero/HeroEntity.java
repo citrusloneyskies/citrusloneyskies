@@ -282,6 +282,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     }
 
     public void addXp(int amount) {
+        if (!isAlive()) return;
         int xp = xp() + amount;
         entityData.set(XP, xp);
         int lvl = heroLevel();
@@ -390,6 +391,18 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
 
     private void brain(ServerLevel level) {
         if (isNoAi()) return;
+        // keep this summon's record for the per-player limits fresh; a summon whose pact lapsed while it sat unloaded
+        // (and whose owner has since filled its place) dissolves
+        if (tickCount % 100 == 7 && getOwnerId() != null && !Companions.touch(level, this)) {
+            if (owner() instanceof ServerPlayer sp) {
+                sp.displayClientMessage(Component.literal(kind.title + " was left untended too long and its bond has faded.")
+                        .withStyle(ChatFormatting.GRAY), false);
+            }
+            Vfx.spray(level, FxStyle.SMOKE, position().add(0, getBbHeight() * 0.5, 0), 0x6A6A70, 0x2A2A30, 1f, 20, 0.2f, 0.5f);
+            claimSigilReturn();
+            discard();
+            return;
+        }
         for (int i = 0; i < cooldowns.length; i++) if (cooldowns[i] > 0) cooldowns[i]--;
         if (attackCooldown > 0) attackCooldown--;
         if (dodgeCooldown > 0) dodgeCooldown--;
@@ -518,6 +531,15 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     /** The skill currently running (0 when none). */
     public int activeSkill() {
         return skill;
+    }
+
+    private boolean sigilReturned;
+
+    /** True the first time only: a summon hands back its sigil at most once (death, dismissal or a defeat). */
+    public boolean claimSigilReturn() {
+        if (sigilReturned) return false;
+        sigilReturned = true;
+        return true;
     }
 
     protected boolean ready(int id) {
@@ -926,6 +948,8 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
     // ------------------------------------------------------------------ lifecycle
 
     public void onWaveCleared() {
+        // never "heal" a hero in its death throes back to life: its sigil is already on the way home
+        if (!isAlive()) return;
         setHealth(getMaxHealth());
         retreating = false;
         if (level() instanceof ServerLevel sl) Vfx.spray(sl, FxStyle.STAR, position().add(0, getBbHeight(), 0), 0xFFFFFF, 0x9CFFB0, 0.25f, 10, 0.15f, 1);

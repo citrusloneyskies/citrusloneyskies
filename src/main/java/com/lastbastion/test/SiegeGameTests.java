@@ -639,6 +639,7 @@ public final class SiegeGameTests {
         HeroEntity lucifer = mine.size() == 1 ? mine.get(0) : null;
         if (lucifer == null || lucifer.kind != HeroKind.LUCIFER) fails.append("Lucifer not bound (").append(mine.size()).append(" devils); ");
         else if (lucifer.mode() != HeroMode.FOLLOW) fails.append("devil should follow its summoner away from a core; ");
+        if (lucifer != null && lucifer.getMaxHealth() < HeroKind.LUCIFER.hp - 1) fails.append("max health capped at ").append(lucifer.getMaxHealth()).append("; ");
         if (p.getHealth() > 10.5f || !p.isAlive()) fails.append("no blood price (health ").append(p.getHealth()).append("); ");
         // one pact per soul
         net.minecraft.world.item.ItemStack second = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.sigil(HeroKind.MOLOCH));
@@ -661,7 +662,12 @@ public final class SiegeGameTests {
             if (!mailed) fails.append("fallen pact not returned; ");
         }
         d.fallenHeroes.removeIf(f -> f.owner().equals(p.getUUID()));
-        for (HeroEntity hero : com.lastbastion.entity.hero.Companions.ownedAnywhere(level.getServer(), p.getUUID(), false)) hero.discard();
+        // the bound-summon records hold the limits even for unloaded summons: Lucifer's went with his death
+        if (!com.lastbastion.entity.hero.Companions.bound(level, p.getUUID(), true).isEmpty()) fails.append("dead devil still bound; ");
+        for (HeroEntity hero : com.lastbastion.entity.hero.Companions.ownedAnywhere(level.getServer(), p.getUUID(), false)) {
+            com.lastbastion.entity.hero.Companions.unbind(level, hero);
+            hero.discard();
+        }
         if (fails.length() == 0) h.succeed();
         else h.fail(fails.toString());
     }

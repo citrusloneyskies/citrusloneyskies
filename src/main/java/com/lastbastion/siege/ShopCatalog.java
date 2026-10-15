@@ -262,6 +262,7 @@ public final class ShopCatalog {
     private static Component upgradeHeld(ServerLevel level, ServerPlayer player, ItemStack held) {
         int mk = Arsenal.mk(held) + 1;
         Arsenal.setMk(held, mk);
+        Milestones.award(player, Milestones.MASTERWORK);
         String title = held.getItem() instanceof Arsenal.Upgradeable u ? u.displayTitle() : "Weapon";
         level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.ANVIL_USE, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.2f);
         level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.4f);

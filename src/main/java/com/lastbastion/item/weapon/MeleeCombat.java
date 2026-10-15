@@ -63,6 +63,8 @@ public final class MeleeCombat {
     static final class State {
         long lastSwing = -1000;
         int step = -1;
+        /** The weapon the combo belongs to: switching weapons starts a fresh combo. */
+        WeaponKind kind;
         long nextSwing;
         long parryUntil;
         long edgeUntil;
@@ -120,17 +122,23 @@ public final class MeleeCombat {
         if (!(stack.getItem() instanceof MeleeWeaponItem w) || p.isSpectator() || com.lastbastion.siege.raid.Downed.isDowned(p)) return false;
         WeaponKind k = w.kind;
         State st = state(p);
+        if (st.kind != k) {
+            st.kind = k;
+            st.step = -1;
+        }
         long now = level.getGameTime();
         if (!force && (now < st.nextSwing || now < st.whirlUntil || st.leaping)) return false;
         float strength = force ? 1f : Mth.clamp(p.getAttackStrengthScale(0.5f) * (k == WeaponKind.BONECLEAVER && Arsenal.awakened(stack) ? 1f + bloodlust(p) : 1f), 0f, 1f);
         boolean strong = strength > 0.7f;
         int window = Math.max(30, k.swingTicks() * 3);
-        int step = strong ? (now - st.lastSwing <= window ? (st.step + 1) % k.combo.length : 0) : Math.max(0, st.step);
-        st.step = step;
+        int step = comboStep(k, strong, st.step, now - st.lastSwing <= window);
+        // weak swings are plain cuts that don't advance the combo (and can't repeat a finisher's spin)
+        if (strong) st.step = step;
         st.lastSwing = now;
-        st.nextSwing = now + 3;
+        // clicking can't outpace the weapon: at most two weak swings per full swing, so spam never beats timing
+        st.nextSwing = now + (force ? 3 : Math.max(3, interval(p, k, stack) / 2 - 1));
         p.resetAttackStrengthTicker();
-        SwingStyle style = k.combo[step];
+        SwingStyle style = strong ? k.combo[step] : weakStyle(k);
         boolean finisher = strong && step == k.combo.length - 1;
         int dur = animTicks(k, stack);
         broadcastAnim(p, k, style, step, dur);
@@ -150,14 +158,14 @@ public final class MeleeCombat {
         if (now < st.edgeUntil) dmg *= 1.25f;
 
         List<LivingEntity> targets = targets(level, p, k, style, finisher);
+        if (!strong && targets.size() > 1) targets = new ArrayList<>(targets.subList(0, 1));
         int landed = 0;
         for (int i = 0; i < targets.size(); i++) {
             LivingEntity t = targets.get(i);
             float d = dmg * (i == 0 ? 1f : 0.8f);
-            if (hit(level, p, stack, k, t, d, style, finisher, crit)) landed++;
+            if (hit(level, p, stack, k, t, d, style, finisher, crit, strong)) landed++;
         }
         if (landed > 0) {
-            st.hits += landed;
             if (strong) gainFury(p, stack, k, landed, now);
             hitSound(level, p, k, crit, finisher);
             if (crit) level.sendParticles(ParticleTypes.CRIT, targets.get(0).getX(), targets.get(0).getY() + targets.get(0).getBbHeight() * 0.6,
@@ -222,7 +230,8 @@ public final class MeleeCombat {
                 && SiegeDamage.canHit(p, e) && !(e instanceof SiegeEnemy se && se.isUntargetable());
     }
 
-    static boolean sight(ServerLevel level, Entity p, Vec3 from, Vec3 to) {
+    /** True if nothing solid stands between {@code from} and {@code to}. */
+    public static boolean sight(ServerLevel level, Entity p, Vec3 from, Vec3 to) {
         HitResult r = level.clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, p));
         return r.getType() == HitResult.Type.MISS || r.getLocation().distanceToSqr(from) >= from.distanceToSqr(to) - 0.6;
     }
@@ -232,8 +241,30 @@ public final class MeleeCombat {
     }
 
     /** One weapon hit on one target, with every on-hit passive. */
+    /**
+     * The combo step for a swing: a strong swing within the window continues the combo, any other strong swing
+     * starts it over; a weak swing keeps the current step (clamped to this weapon's combo).
+     */
+    public static int comboStep(WeaponKind k, boolean strong, int current, boolean inWindow) {
+        int len = k.combo.length;
+        if (strong) return current >= 0 && current < len && inWindow ? (current + 1) % len : 0;
+        return Mth.clamp(current, 0, len - 1);
+    }
+
+    /** The plain cut used for weak (spammed) swings: the first non-spinning stroke of the combo. */
+    public static SwingStyle weakStyle(WeaponKind k) {
+        for (SwingStyle s : k.combo) if (s != SwingStyle.SPIN) return s;
+        return k.combo[0];
+    }
+
     static boolean hit(ServerLevel level, ServerPlayer p, ItemStack stack, WeaponKind k, LivingEntity t, float dmg, SwingStyle style,
                        boolean finisher, boolean crit) {
+        return hit(level, p, stack, k, t, dmg, style, finisher, crit, true);
+    }
+
+    /** One weapon hit. {@code procs} false (a weak swing) skips the on-hit status effects and passives. */
+    static boolean hit(ServerLevel level, ServerPlayer p, ItemStack stack, WeaponKind k, LivingEntity t, float dmg, SwingStyle style,
+                       boolean finisher, boolean crit, boolean procs) {
         boolean pierce = false;
         switch (k) {
             case MILITIA_LONGSWORD -> pierce = finisher;
@@ -268,6 +299,7 @@ public final class MeleeCombat {
         if (!(k == WeaponKind.SOULREAPER && finisher)) SiegeDamage.push(t, p.position(), kb, style == SwingStyle.UPPERCUT ? 0.45 : 0.08);
         Vec3 at = t.position().add(0, t.getBbHeight() * 0.6, 0);
         Vfx.spray(level, FxStyle.SPARK, at, k.color2, k.color, 0.12f, crit ? 10 : 5, 0.35f, 0.2f);
+        if (!procs) return true;
         switch (k) {
             case FROSTFANG -> {
                 MobEffectInstance chill = t.getEffect(ModEffects.CHILLED.get());
@@ -288,7 +320,8 @@ public final class MeleeCombat {
             }
             case STORMPIERCER -> {
                 if (style == SwingStyle.THRUST) SiegeDamage.apply(t, ModEffects.SHOCKED.get(), 20, 0);
-                if (Arsenal.awakened(stack) && (state(p).hits + 1) % 4 == 0) {
+                // Static Charge: every fourth landed hit calls a bolt, counted hit by hit
+                if (Arsenal.awakened(stack) && ++state(p).hits % 4 == 0) {
                     Vfx.lightning(level, t.position(), 0xF4F06A, 0.8f);
                     SiegeDamage.areaDamage(level, t.position(), 1.6, dmg * 0.8f, Element.LIGHTNING, p, p, true);
                     level.playSound(null, t.blockPosition(), SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.PLAYERS, 0.6f, 1.6f);

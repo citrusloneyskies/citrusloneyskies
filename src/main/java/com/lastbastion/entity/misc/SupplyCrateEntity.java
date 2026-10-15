@@ -133,6 +133,7 @@ public class SupplyCrateEntity extends Entity {
     public void claim(ServerPlayer p) {
         if (claimed || !isAlive() || !(level() instanceof ServerLevel sl)) return;
         claimed = true;
+        com.lastbastion.siege.Milestones.award(p, com.lastbastion.siege.Milestones.SUPPLY);
         SiegeData d = SiegeManager.data(sl);
         int credits = SiegeManager.award(sl, d, p.getUUID(), 60 + 15 * wave, position().add(0, 1.2, 0), false);
         List<ItemStack> loot = roll(sl);

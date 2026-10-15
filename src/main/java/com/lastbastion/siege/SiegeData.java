@@ -63,9 +63,21 @@ public class SiegeData extends SavedData {
     public int prepTicks;
     /** The victory wave has been cleared (the siege continues as endless). */
     public boolean victorious;
+    /** Wave tick each tracked enemy was last seen loaded (not saved: after a restart everything gets a fresh grace). */
+    public final transient Map<UUID, Integer> trackedSeen = new HashMap<>();
+    /** Spawn groups that found no ground this wave (for the "the horde can't reach the core" warning). */
+    public transient int spawnStalls;
 
-    public record FallenHero(UUID owner, int heroKind, int level, int xp) {
+    /** A sigil waiting for its owner: {@code recover} ticks of recovery start when it is delivered. */
+    public record FallenHero(UUID owner, int heroKind, int level, int xp, int recover) {
     }
+
+    /** A summon out in the world (loaded or not), for the per-player limits. */
+    public record Summon(UUID owner, int kind, long lastSeen) {
+    }
+
+    /** Every bound hero and devil by entity UUID, so limits hold even while a summon sits in an unloaded chunk. */
+    public final Map<UUID, Summon> summons = new HashMap<>();
 
     public static SiegeData get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(SiegeData::load, SiegeData::new, NAME);
@@ -132,7 +144,11 @@ public class SiegeData extends SavedData {
         for (Tag t : tag.getList("queue", Tag.TAG_COMPOUND)) d.queue.add(WavePlanner.Group.load((CompoundTag) t));
         for (Tag t : tag.getList("fallen", Tag.TAG_COMPOUND)) {
             CompoundTag c = (CompoundTag) t;
-            d.fallenHeroes.add(new FallenHero(c.getUUID("o"), c.getInt("k"), c.getInt("l"), c.getInt("x")));
+            d.fallenHeroes.add(new FallenHero(c.getUUID("o"), c.getInt("k"), c.getInt("l"), c.getInt("x"), c.contains("r") ? c.getInt("r") : -1));
+        }
+        for (Tag t : tag.getList("summons", Tag.TAG_COMPOUND)) {
+            CompoundTag c = (CompoundTag) t;
+            if (c.hasUUID("e") && c.hasUUID("o")) d.summons.put(c.getUUID("e"), new Summon(c.getUUID("o"), c.getInt("k"), c.getLong("t")));
         }
         d.waveTick = tag.getInt("waveTick");
         d.waveTotal = tag.getInt("waveTotal");
@@ -192,9 +208,20 @@ public class SiegeData extends SavedData {
             c.putInt("k", f.heroKind());
             c.putInt("l", f.level());
             c.putInt("x", f.xp());
+            c.putInt("r", f.recover());
             fl.add(c);
         }
         tag.put("fallen", fl);
+        ListTag sl = new ListTag();
+        for (Map.Entry<UUID, Summon> e : summons.entrySet()) {
+            CompoundTag c = new CompoundTag();
+            c.putUUID("e", e.getKey());
+            c.putUUID("o", e.getValue().owner());
+            c.putInt("k", e.getValue().kind());
+            c.putLong("t", e.getValue().lastSeen());
+            sl.add(c);
+        }
+        tag.put("summons", sl);
         tag.putInt("waveTick", waveTick);
         tag.putInt("waveTotal", waveTotal);
         tag.putInt("waveKilled", waveKilled);
