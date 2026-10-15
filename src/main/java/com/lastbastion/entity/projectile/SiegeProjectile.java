@@ -141,6 +141,7 @@ public class SiegeProjectile extends Projectile {
 
     @Override
     public void tick() {
+        net.minecraft.world.entity.player.Player lbActorPrev = com.lastbastion.combat.SiegeDamage.pushActor(getOwner());
         LivingEntity lbPrev = com.lastbastion.combat.SiegeDamage.pushHostile(getOwner() instanceof com.lastbastion.entity.hero.HeroEntity lbHero ? lbHero.getTarget() : null);
         try {
         super.tick();
@@ -185,6 +186,7 @@ public class SiegeProjectile extends Projectile {
             com.lastbastion.util.Safe.report("SiegeProjectile.tick", lbCrash);
         } finally {
             com.lastbastion.combat.SiegeDamage.popHostile(lbPrev);
+            com.lastbastion.combat.SiegeDamage.popActor(lbActorPrev);
         }
     }
 

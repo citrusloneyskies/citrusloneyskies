@@ -78,6 +78,13 @@ public final class MeleeCombat {
         long phaseWindow;
         boolean phaseEcho;
         int hits;
+        /** Phase Rend in flight: ticks left, heading, speed per tick, damage, who has been cut, last trail point. */
+        int dashTicks;
+        Vec3 dashDir = Vec3.ZERO;
+        double dashSpeed;
+        float dashDmg;
+        final java.util.Set<Integer> dashHit = new java.util.HashSet<>();
+        Vec3 dashLast = Vec3.ZERO;
     }
 
     private static final Map<UUID, State> STATES = new HashMap<>();
@@ -93,7 +100,15 @@ public final class MeleeCombat {
     }
 
     static void later(ServerLevel level, int ticks, Runnable r) {
-        PENDING.add(new Pending(level, level.getGameTime() + ticks, r));
+        net.minecraft.world.entity.player.Player actor = SiegeDamage.actingPlayer();
+        PENDING.add(new Pending(level, level.getGameTime() + ticks, () -> {
+            net.minecraft.world.entity.player.Player prev = SiegeDamage.pushActor(actor);
+            try {
+                r.run();
+            } finally {
+                SiegeDamage.popActor(prev);
+            }
+        }));
     }
 
     // ------------------------------------------------------------------ swings
@@ -118,6 +133,8 @@ public final class MeleeCombat {
      * Returns true if a swing happened.
      */
     public static boolean swing(ServerLevel level, ServerPlayer p, boolean force) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(p);
+        try {
         ItemStack stack = p.getMainHandItem();
         if (!(stack.getItem() instanceof MeleeWeaponItem w) || p.isSpectator() || com.lastbastion.siege.raid.Downed.isDowned(p)) return false;
         WeaponKind k = w.kind;
@@ -173,6 +190,9 @@ public final class MeleeCombat {
         }
         if (finisher) finisherEffect(level, p, stack, k, style, dmg, targets);
         return true;
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
+        }
     }
 
     static int animTicks(WeaponKind k, ItemStack stack) {
@@ -463,6 +483,8 @@ public final class MeleeCombat {
 
     /** Right-click special for instant abilities. Returns false if it could not be used. */
     public static boolean special(ServerLevel level, ServerPlayer p, ItemStack stack, WeaponKind k) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(p);
+        try {
         State st = state(p);
         long now = level.getGameTime();
         // the Voidedge's echo dash is free
@@ -497,6 +519,9 @@ public final class MeleeCombat {
         pay(p, stack, k, now);
         cooldown(p, stack, k, k.specialCooldown * 20);
         return true;
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
+        }
     }
 
     static boolean riposte(ServerLevel level, ServerPlayer p, ItemStack stack, State st, long now) {
@@ -562,48 +587,66 @@ public final class MeleeCombat {
         return true;
     }
 
+    /** Phase Rend: a real dash. The wielder is driven along the path over a few ticks, cutting everything passed. */
     static boolean phaseRend(ServerLevel level, ServerPlayer p, ItemStack stack) {
         Vec3 dir = flatLook(p);
         Vec3 start = p.position();
-        Vec3 end = start;
+        double reach = 0;
         for (double d = 0.5; d <= 9.0; d += 0.5) {
-            Vec3 c = start.add(dir.scale(d));
-            if (!level.noCollision(p, p.getDimensions(p.getPose()).makeBoundingBox(c))) break;
-            end = c;
+            if (!level.noCollision(p, p.getDimensions(p.getPose()).makeBoundingBox(start.add(dir.scale(d))))) break;
+            reach = d;
         }
-        if (end.distanceToSqr(start) < 1.0) return false;
-        Vec3 e2 = end;
-        float dmg = (float) p.getAttributeValue(Attributes.ATTACK_DAMAGE) * 2.2f;
-        List<LivingEntity> victims = new ArrayList<>();
-        Vec3 seg = e2.subtract(start);
-        double len = seg.length();
-        for (LivingEntity e : SiegeDamage.enemiesAround(level, start.add(seg.scale(0.5)), len * 0.5 + 2)) {
-            Vec3 rel = e.position().subtract(start);
-            double along = Mth.clamp(rel.dot(seg) / len, 0, len);
-            if (rel.subtract(seg.normalize().scale(along)).horizontalDistance() < 1.6 + e.getBbWidth() * 0.5) victims.add(e);
-        }
-        Vfx.dash(level, start.add(0, 1, 0), e2.add(0, 1, 0), 0xB04AFF, 0.45f, 14);
+        if (reach < 1.0) return false;
+        State st = state(p);
+        st.dashTicks = 7;
+        st.dashDir = dir;
+        st.dashSpeed = reach / 6.0; // the first step runs at once and shares this tick
+        st.dashDmg = (float) p.getAttributeValue(Attributes.ATTACK_DAMAGE) * 2.2f;
+        st.dashHit.clear();
+        st.dashLast = start.add(0, 1, 0);
+        st.noFallUntil = level.getGameTime() + 30;
         Vfx.spray(level, FxStyle.GLOW, start.add(0, 1, 0), 0xD8A0FF, 0x6A20C0, 0.3f, 12, 0.2f, 0f);
-        p.connection.teleport(e2.x, e2.y, e2.z, p.getYRot(), p.getXRot());
-        p.fallDistance = 0;
+        Vfx.ring(level, start.add(0, 0.1, 0), 0xB04AFF, 1.6f, 8, 0.4f);
         level.playSound(null, start.x, start.y, start.z, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 0.9f, 0.7f);
+        level.playSound(null, start.x, start.y, start.z, SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 1f, 0.6f);
         broadcastAnim(p, WeaponKind.VOIDEDGE, SwingStyle.SLASH_L, 0, 8);
-        for (LivingEntity v : victims) {
-            Vec3 at = v.position().add(0, v.getBbHeight() * 0.5, 0);
-            Vfx.sigil(level, v.position().add(0, 0.05, 0), 0xB04AFF, 1.2f, 20, 2f);
-            later(level, 18, () -> {
-                if (!v.isAlive()) return;
-                Vec3 now = v.position().add(0, v.getBbHeight() * 0.5, 0);
-                Vfx.slash(level, now, p.getYRot() + 45, 45, 160, 1.4f, 0xB04AFF, 0xF0D8FF, 8, 0.35f);
-                Vfx.slash(level, now, p.getYRot() - 45, -45, 160, 1.4f, 0xB04AFF, 0xF0D8FF, 8, 0.35f);
-                Vfx.flash(level, now, 0xC86BFF, 1.4f, 6);
-                SiegeDamage.deal(v, p, p, dmg, Element.ARCANE, false);
-                SiegeDamage.applyStacking(v, ModEffects.MARKED.get(), 120, 2);
-                level.playSound(null, v.blockPosition(), SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.PLAYERS, 1f, 0.6f);
-            });
-            Vfx.flash(level, at, 0x8A30E0, 0.6f, 6);
-        }
+        dashStep(level, p, st);
         return true;
+    }
+
+    /** One tick of Phase Rend: push the wielder, trail the void, mark everything in reach for a delayed rift. */
+    static void dashStep(ServerLevel level, ServerPlayer p, State st) {
+        if (st.dashTicks <= 0) return;
+        st.dashTicks--;
+        Vec3 v = st.dashDir.scale(st.dashSpeed);
+        boolean last = st.dashTicks == 0;
+        p.setDeltaMovement(last ? v.scale(0.3) : new Vec3(v.x, Math.max(0, p.getDeltaMovement().y), v.z));
+        p.hurtMarked = true;
+        p.fallDistance = 0;
+        Vec3 here = p.position().add(0, 1, 0);
+        Vfx.dash(level, st.dashLast, here.add(v), 0xB04AFF, 0.45f, 10);
+        st.dashLast = here;
+        float dmg = st.dashDmg;
+        float yaw = p.getYRot();
+        for (LivingEntity v2 : SiegeDamage.enemiesAround(level, here.add(v.scale(0.5)), 1.6 + st.dashSpeed)) {
+            if (v2 == p || !st.dashHit.add(v2.getId())) continue;
+            Vfx.flash(level, v2.position().add(0, v2.getBbHeight() * 0.5, 0), 0x8A30E0, 0.6f, 6);
+            Vfx.sigil(level, v2.position().add(0, 0.05, 0), 0xB04AFF, 1.2f, 20, 2f);
+            later(level, 18, () -> {
+                if (!v2.isAlive()) return;
+                Vec3 now = v2.position().add(0, v2.getBbHeight() * 0.5, 0);
+                Vfx.slash(level, now, yaw + 45, 45, 160, 1.4f, 0xB04AFF, 0xF0D8FF, 8, 0.35f);
+                Vfx.slash(level, now, yaw - 45, -45, 160, 1.4f, 0xB04AFF, 0xF0D8FF, 8, 0.35f);
+                Vfx.flash(level, now, 0xC86BFF, 1.4f, 6);
+                SiegeDamage.deal(v2, p, p, dmg, Element.ARCANE, false);
+                SiegeDamage.applyStacking(v2, ModEffects.MARKED.get(), 120, 2);
+                level.playSound(null, v2.blockPosition(), SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.PLAYERS, 1f, 0.6f);
+            });
+        }
+        if (p.horizontalCollision && !last) {
+            st.dashTicks = 0;
+            p.setDeltaMovement(Vec3.ZERO);
+        }
     }
 
     static boolean javelin(ServerLevel level, ServerPlayer p, ItemStack stack) {
@@ -784,11 +827,14 @@ public final class MeleeCombat {
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(e.player);
+        try {
         try {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         State st = STATES.get(p.getUUID());
         if (st == null) return;
         long now = level.getGameTime();
+        if (st.dashTicks > 0) dashStep(level, p, st);
         ItemStack stack = p.getMainHandItem();
         float base = (float) p.getAttributeValue(Attributes.ATTACK_DAMAGE);
         if (now < st.whirlUntil) {
@@ -837,6 +883,9 @@ public final class MeleeCombat {
         }
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("MeleeCombat.onPlayerTick", lbCrash);
+        }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
         }
     }
 

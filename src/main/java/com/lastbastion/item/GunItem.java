@@ -196,6 +196,8 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(player);
+        try {
         ItemStack stack = player.getItemInHand(hand);
         if (reloading(stack)) return InteractionResultHolder.fail(stack);
         boolean alt = player.isShiftKeyDown();
@@ -226,6 +228,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
             clientShot(alt ? 1.6f : 1f);
         }
         return InteractionResultHolder.consume(stack);
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
+        }
     }
 
     @Override
@@ -245,6 +250,8 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void onUseTick(Level level, LivingEntity user, ItemStack stack, int remaining) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(user);
+        try {
         try {
         int used = getUseDuration(stack) - remaining;
         if (kind == GunKind.STARPIERCER) {
@@ -305,10 +312,15 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("GunItem.onUseTick", lbCrash);
         }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
+        }
     }
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity user, int remaining) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(user);
+        try {
         try {
         if (kind != GunKind.STARPIERCER) return;
         int used = getUseDuration(stack) - remaining;
@@ -350,6 +362,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         user.push(-dir.x * (over ? 0.8 : 0.4), 0.1, -dir.z * (over ? 0.8 : 0.4));
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("GunItem.releaseUsing", lbCrash);
+        }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
         }
     }
 
@@ -568,6 +583,8 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(entity);
+        try {
         try {
         if (level.isClientSide) return;
         CompoundTag tag = stack.getTag();
@@ -590,6 +607,9 @@ public class GunItem extends Item implements Arsenal.Upgradeable {
         }
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("GunItem.inventoryTick", lbCrash);
+        }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
         }
     }
 

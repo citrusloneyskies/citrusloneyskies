@@ -165,6 +165,8 @@ public final class ArmorSets {
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(e.player);
+        try {
         try {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p) || !(p.level() instanceof ServerLevel level)) return;
         ArmorSet set = fullSet(p);
@@ -210,6 +212,9 @@ public final class ArmorSets {
         }
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("ArmorSets.onPlayerTick", lbCrash);
+        }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
         }
     }
 

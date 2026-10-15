@@ -99,6 +99,8 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(player);
+        try {
         ItemStack stack = player.getItemInHand(hand);
         if (hand != InteractionHand.MAIN_HAND) return InteractionResultHolder.pass(stack);
         if (charges()) {
@@ -113,6 +115,9 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
             if (!MeleeCombat.special(sl, sp, stack, kind)) return InteractionResultHolder.fail(stack);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
+        }
     }
 
     @Override
@@ -127,6 +132,8 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
 
     @Override
     public void onUseTick(Level level, LivingEntity user, ItemStack stack, int remaining) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(user);
+        try {
         try {
         if (level instanceof ServerLevel sl && user instanceof ServerPlayer sp) {
             MeleeCombat.chargeTick(sl, sp, stack, kind, getUseDuration(stack) - remaining);
@@ -134,16 +141,24 @@ public class MeleeWeaponItem extends Item implements Arsenal.Upgradeable {
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("MeleeWeaponItem.onUseTick", lbCrash);
         }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
+        }
     }
 
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity user, int remaining) {
+        net.minecraft.world.entity.player.Player lbActor = com.lastbastion.combat.SiegeDamage.pushActor(user);
+        try {
         try {
         if (level instanceof ServerLevel sl && user instanceof ServerPlayer sp) {
             MeleeCombat.releaseCharge(sl, sp, stack, kind, getUseDuration(stack) - remaining);
         }
             } catch (Exception | LinkageError | StackOverflowError | AssertionError lbCrash) {
             com.lastbastion.util.Safe.report("MeleeWeaponItem.releaseUsing", lbCrash);
+        }
+            } finally {
+            com.lastbastion.combat.SiegeDamage.popActor(lbActor);
         }
     }
 

@@ -179,7 +179,37 @@ public final class SiegeDamage {
 
     public static List<LivingEntity> enemiesAround(ServerLevel level, Vec3 center, double radius) {
         LivingEntity extra = extraHostile;
-        return around(level, center, radius, e -> isEnemy(e) || (extra != null && e == extra));
+        Player actor = actingPlayer;
+        return around(level, center, radius, e -> isEnemy(e) || (extra != null && e == extra) || (actor != null && fairForPlayer(e, actor)));
+    }
+
+    /**
+     * While a player's weapon, gun, armour or projectile acts, its area attacks also catch whatever a sword
+     * could hit (cows, sheep, slimes...), but never villagers, golems, armour stands or anyone's pets.
+     */
+    @Nullable
+    private static Player actingPlayer;
+
+    @Nullable
+    public static Player actingPlayer() {
+        return actingPlayer;
+    }
+
+    @Nullable
+    public static Player pushActor(@Nullable Entity e) {
+        Player prev = actingPlayer;
+        actingPlayer = e instanceof Player p && !p.level().isClientSide ? p : null;
+        return prev;
+    }
+
+    public static void popActor(@Nullable Player prev) {
+        actingPlayer = prev;
+    }
+
+    private static boolean fairForPlayer(LivingEntity e, Player p) {
+        if (e == p || e instanceof Player || isDefender(e) || e instanceof net.minecraft.world.entity.decoration.ArmorStand) return false;
+        if (e instanceof net.minecraft.world.entity.npc.AbstractVillager || e instanceof net.minecraft.world.entity.animal.AbstractGolem) return false;
+        return !(e instanceof net.minecraft.world.entity.OwnableEntity o && o.getOwnerUUID() != null);
     }
 
     /**
