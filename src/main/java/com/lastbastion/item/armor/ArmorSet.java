@@ -7,7 +7,7 @@ package com.lastbastion.item.armor;
 public enum ArmorSet {
     //            id               title                     tier  defence           tough  kb    cost
     SCAVENGER("scavenger", "Scavenger Rig", 1, new int[]{2, 5, 4, 2}, 0f, 0f, 400, 0xB08A5A,
-            "Scrounger", "+20% credits from kills and +10% movement speed.",
+            "Scrounger", "+12% credits from kills and +10% movement speed.",
             "Patched leather, scrap plate and a lot of optimism."),
     SHADOWSTALKER("shadowstalker", "Shadowstalker Leathers", 2, new int[]{3, 6, 5, 2}, 1f, 0f, 1300, 0x6A50A0,
             "Evasion", "20% chance to slip out of any attack. Critical hits deal +30% damage.",

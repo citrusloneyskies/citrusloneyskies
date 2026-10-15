@@ -71,7 +71,7 @@ public final class ShopCatalog {
                 int lvl = upgrades[upgrade.ordinal()];
                 return lvl >= upgrade.maxLevel ? -1 : upgrade.costs[lvl];
             }
-            if (id.equals("core_repair_now")) return 150 + 25 * wave;
+            if (id.equals("core_repair_now")) return Math.min(150 + 25 * wave, 350);
             return baseCost;
         }
     }
@@ -192,7 +192,7 @@ public final class ShopCatalog {
                 "30 explosive damage under the first zombie to step on it."));
         l.add(new Entry("medic_shrine", Category.FORTIFY, "Medic Shrine", 500, stack(ModBlocks.MEDIC_SHRINE, 1), stack(ModBlocks.MEDIC_SHRINE, 1), null,
                 "Heals players and heroes within 7 blocks and cleanses ailments."));
-        l.add(new Entry("soul_harvester", Category.FORTIFY, "Soul Harvester", 800, stack(ModBlocks.SOUL_HARVESTER, 1), stack(ModBlocks.SOUL_HARVESTER, 1), null,
+        l.add(new Entry("soul_harvester", Category.FORTIFY, "Soul Harvester", 1200, stack(ModBlocks.SOUL_HARVESTER, 1), stack(ModBlocks.SOUL_HARVESTER, 1), null,
                 "+25% credits for kills within 16 blocks."));
         l.add(new Entry("repair_pylon", Category.FORTIFY, "Repair Pylon", 450, stack(ModBlocks.REPAIR_PYLON, 1), stack(ModBlocks.REPAIR_PYLON, 1), null,
                 "Repairs turrets within 8 blocks."));
@@ -202,7 +202,8 @@ public final class ShopCatalog {
                     u.desc, "Max level " + u.maxLevel));
         }
         l.add(new Entry("core_repair_now", Category.CORE, "Emergency Core Repair", 150, () -> new ItemStack(Items.AMETHYST_SHARD), null, null,
-                "Immediately restores 25% of the core's health. Price rises each wave."));
+                "Immediately restores 40% of the core's health. Price rises each wave (capped at 350).",
+                "Pricier than a Core Repair Kit (25%) but stronger in an emergency."));
 
         entries = Collections.unmodifiableList(l);
         Map<String, Entry> m = new HashMap<>();
@@ -244,7 +245,7 @@ public final class ShopCatalog {
         }
         if (id.equals(UPGRADE_WEAPON)) return upgradeHeld(level, player, held);
         if (id.equals("core_repair_now")) {
-            SiegeManager.healCore(level, d.maxHp() * 0.25f);
+            SiegeManager.healCore(level, d.maxHp() * 0.40f);
             SiegeManager.syncHud(level, d);
             return Component.literal("Core repaired.").withStyle(ChatFormatting.GREEN);
         }
