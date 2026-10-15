@@ -537,4 +537,132 @@ public final class SiegeGameTests {
         if (fails.length() == 0) h.succeed();
         else h.fail(fails.toString());
     }
+
+    /**
+     * Every devil runs every skill and its ultimate against a horde and a boss (and picks skills on its own in
+     * between), calls up hellspawn, and ends idle in a clean state: visible, mortal and on the ground.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1700, batch = "siege_devils")
+    public static void devilsUnleashed(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        java.util.List<HeroEntity> devils = new java.util.ArrayList<>();
+        java.util.List<HeroKind> kinds = java.util.Arrays.stream(HeroKind.values()).filter(k -> k.devil).toList();
+        for (int i = 0; i < kinds.size(); i++) {
+            HeroEntity d = kinds.get(i).type().get().create(level);
+            Vec3 p = ring(core, 6, i, kinds.size());
+            d.moveTo(p.x, p.y, p.z);
+            d.finalizeSpawn(level, level.getCurrentDifficultyAt(core), MobSpawnType.EVENT, null, null);
+            d.setMode(HeroMode.HUNT);
+            d.setLevelAndXp(5, 0);
+            level.addFreshEntity(d);
+            d.onSummoned(level);
+            devils.add(d);
+        }
+        if (devils.size() != 5) h.fail("expected five devils, found " + devils.size());
+        java.util.function.Consumer<Integer> horde = n -> {
+            for (int i = 0; i < n; i++) {
+                ZombieKind k = ZombieKind.values()[i % ZombieKind.values().length];
+                ZombieSpawner.spawn(level, k, ZombieRank.byId(i % 4), 0, ring(core, 12, i, n), false, true);
+            }
+        };
+        horde.accept(28);
+        SiegeBoss.spawn(level, BossKind.GOREHOUND, ring(core, 13, 3, 8), 10, 1);
+        int[] casts = {6, 7, 8, 9, 10, 11};
+        StringBuilder fails = new StringBuilder();
+        for (int j = 0; j < casts.length; j++) {
+            int id = casts[j];
+            int at = 40 + j * 120;
+            h.runAfterDelay(at, () -> {
+                for (HeroEntity d : devils) if (d.isAlive()) d.forceSkill(id);
+            });
+            // fresh enemies and ready skills, so the devils also choose their own moves in between
+            h.runAfterDelay(at + 60, () -> {
+                horde.accept(10);
+                for (HeroEntity d : devils) d.resetCooldowns();
+            });
+        }
+        h.runAfterDelay(700, () -> {
+            boolean spawn = !level.getEntitiesOfClass(com.lastbastion.entity.hero.HellspawnEntity.class, new net.minecraft.world.phys.AABB(core).inflate(40)).isEmpty();
+            if (!spawn) fails.append("Legions of Hell called up no hellspawn; ");
+        });
+        int ult = 40 + casts.length * 120;
+        h.runAfterDelay(ult, () -> {
+            horde.accept(16);
+            for (HeroEntity d : devils) if (d.isAlive()) d.forceSkill(HeroEntity.ULT);
+        });
+        h.runAfterDelay(ult + 175, () -> {
+            for (HeroEntity d : devils) {
+                if (d instanceof com.lastbastion.entity.hero.MolochDevil m && !m.molten()) fails.append("Moloch's ultimate did not leave him molten; ");
+            }
+            // clear the field so the devils settle, then everyone must end idle and clean
+            for (net.minecraft.world.entity.Entity e : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                    new net.minecraft.world.phys.AABB(core).inflate(48), e -> e instanceof com.lastbastion.combat.SiegeEnemy)) {
+                e.discard();
+            }
+            h.succeedWhen(() -> {
+                if (fails.length() > 0) throw new net.minecraft.gametest.framework.GameTestAssertException(fails.toString());
+                for (HeroEntity d : devils) {
+                    String n = d.kind.shortName();
+                    if (!d.isAlive()) throw new net.minecraft.gametest.framework.GameTestAssertException(n + " died");
+                    if (d.activeSkill() != 0) throw new net.minecraft.gametest.framework.GameTestAssertException(n + " still busy");
+                    if (d.isInvisible() || d.isInvulnerable() || d.isNoGravity()) {
+                        throw new net.minecraft.gametest.framework.GameTestAssertException(n + " left a skill stuck (invisible/invulnerable/floating)");
+                    }
+                    if (d instanceof com.lastbastion.entity.hero.LuciferDevil l && l.soaring()) throw new net.minecraft.gametest.framework.GameTestAssertException("Lucifer stuck in flight");
+                    if (d instanceof com.lastbastion.entity.hero.LeviathanDevil l && l.submerged()) throw new net.minecraft.gametest.framework.GameTestAssertException("Leviathan stuck underground");
+                    if (d instanceof com.lastbastion.entity.hero.BeelzebubDevil b && b.dissolved()) throw new net.minecraft.gametest.framework.GameTestAssertException("Beelzebub stuck as a swarm");
+                }
+                teardown(h, core);
+            });
+        });
+    }
+
+    /** Pacts: bound anywhere without a core, the blood price, one devil per soul, recovering pacts, return on death. */
+    @GameTest(template = "arena", timeoutTicks = 60, batch = "siege_pact")
+    public static void devilPact(GameTestHelper h) {
+        for (int x = 0; x < 32; x++) for (int z = 0; z < 32; z++) h.setBlock(x, 0, z, Blocks.STONE);
+        ServerLevel level = h.getLevel();
+        SiegeData d = SiegeManager.data(level);
+        StringBuilder fails = new StringBuilder();
+        if (d.corePos != null) fails.append("a core is still active; ");
+        net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "pact_tester"));
+        BlockPos at = h.absolutePos(new BlockPos(8, 1, 8));
+        p.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+        p.setHealth(20f);
+        net.minecraft.world.InteractionHand hand = net.minecraft.world.InteractionHand.MAIN_HAND;
+        net.minecraft.world.item.ItemStack pact = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.sigil(HeroKind.LUCIFER));
+        p.setItemInHand(hand, pact);
+        if (!pact.getItem().use(level, p, hand).getResult().consumesAction()) fails.append("pact refused without a core; ");
+        var mine = com.lastbastion.entity.hero.Companions.ownedAnywhere(level.getServer(), p.getUUID(), true);
+        HeroEntity lucifer = mine.size() == 1 ? mine.get(0) : null;
+        if (lucifer == null || lucifer.kind != HeroKind.LUCIFER) fails.append("Lucifer not bound (").append(mine.size()).append(" devils); ");
+        else if (lucifer.mode() != HeroMode.FOLLOW) fails.append("devil should follow its summoner away from a core; ");
+        if (p.getHealth() > 10.5f || !p.isAlive()) fails.append("no blood price (health ").append(p.getHealth()).append("); ");
+        // one pact per soul
+        net.minecraft.world.item.ItemStack second = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.sigil(HeroKind.MOLOCH));
+        p.setItemInHand(hand, second);
+        if (second.getItem().use(level, p, hand).getResult().consumesAction()) fails.append("a second pact was accepted; ");
+        if (com.lastbastion.entity.hero.Companions.ownedAnywhere(level.getServer(), p.getUUID(), true).size() != 1) fails.append("second devil appeared; ");
+        // heroes are a separate limit
+        net.minecraft.world.item.ItemStack sigil = new net.minecraft.world.item.ItemStack(com.lastbastion.registry.ModItems.sigil(HeroKind.ALDRIC));
+        p.setItemInHand(hand, sigil);
+        if (!sigil.getItem().use(level, p, hand).getResult().consumesAction()) fails.append("hero sigil refused while bound to a devil; ");
+        // a recovering pact cannot be used
+        net.minecraft.world.item.ItemStack tired = com.lastbastion.entity.hero.Companions.sigilFor(HeroKind.MOLOCH, 1, 0, level.getGameTime() + 1000, 1000);
+        p.setItemInHand(hand, tired);
+        if (tired.getItem().use(level, p, hand).getResult().consumesAction()) fails.append("recovering pact was usable; ");
+        // a fallen devil's pact goes back to its summoner (mailbox for a player who isn't online), recovering
+        if (lucifer != null) {
+            lucifer.kill();
+            if (lucifer.isAlive()) fails.append("Lucifer survived /kill; ");
+            boolean mailed = d.fallenHeroes.stream().anyMatch(f -> f.owner().equals(p.getUUID()) && f.heroKind() == HeroKind.LUCIFER.ordinal());
+            if (!mailed) fails.append("fallen pact not returned; ");
+        }
+        d.fallenHeroes.removeIf(f -> f.owner().equals(p.getUUID()));
+        for (HeroEntity hero : com.lastbastion.entity.hero.Companions.ownedAnywhere(level.getServer(), p.getUUID(), false)) hero.discard();
+        if (fails.length() == 0) h.succeed();
+        else h.fail(fails.toString());
+    }
 }

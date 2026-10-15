@@ -397,7 +397,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         if (!fighting && tickCount % 20 == 0 && getHealth() < getMaxHealth()) heal(getMaxHealth() * (retreating ? 0.05f : 0.025f));
         if (fighting && tickCount % 10 == 0) gainUlt(ultPassive());
         passiveTick(level);
-        if (skill != ULT && isNoGravity()) setNoGravity(false);
+        if (skill == 0 && isNoGravity()) setNoGravity(false);
 
         if (target != null && !validTarget(target)) target = null;
         entityData.set(COMBAT, target != null);
@@ -407,10 +407,7 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         if (dodgeCooldown <= 0 && (skill == 0 || (skillTick < 6 && skill != ULT)) && !hasEffect(ModEffects.FROZEN.get())) {
             DangerZones.Zone z = DangerZones.threatAt(level, position(), true, getBbWidth() * 0.5 + 0.4);
             if (z != null && canDodge()) {
-                if (skill != 0) {
-                    skill = 0;
-                    skillTick = 0;
-                }
+                interruptSkill();
                 dodge(level, z.escape(position()));
                 return;
             }
@@ -490,6 +487,37 @@ public abstract class HeroEntity extends PathfinderMob implements SiegeAlly {
         anim.play(id);
         getNavigation().stop();
         swing = -1;
+    }
+
+    /** Abort the running skill (a dodge, a recall, a test) and let the hero undo whatever state it had set up. */
+    public void interruptSkill() {
+        if (skill == 0) return;
+        int s = skill;
+        skill = 0;
+        skillTick = 0;
+        onSkillInterrupted(s);
+    }
+
+    /** Clean up after a skill that was cut short: flight, invisibility, invulnerability, held victims. */
+    protected void onSkillInterrupted(int skill) {
+        if (isNoGravity()) setNoGravity(false);
+    }
+
+    /** Test hook: start a skill (or {@link #ULT}) right now, cutting off whatever is running. */
+    public void forceSkill(int id) {
+        interruptSkill();
+        if (id == ULT) speak(Lines.ULT, true);
+        startSkill(id);
+    }
+
+    /** Test hook: every skill ready at once. */
+    public void resetCooldowns() {
+        java.util.Arrays.fill(cooldowns, 0);
+    }
+
+    /** The skill currently running (0 when none). */
+    public int activeSkill() {
+        return skill;
     }
 
     protected boolean ready(int id) {

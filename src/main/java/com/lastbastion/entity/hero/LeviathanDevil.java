@@ -405,7 +405,8 @@ public class LeviathanDevil extends DevilEntity {
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
-        if (submerged()) return false;
+        // untouchable mid-skill, but /kill and the void still apply
+        if (submerged() && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return false;
         return super.hurt(source, amount);
     }
 
@@ -436,5 +437,15 @@ public class LeviathanDevil extends DevilEntity {
     public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         setInvisible(false);
+    }
+
+    @Override
+    protected void onSkillInterrupted(int skill) {
+        super.onSkillInterrupted(skill);
+        coiled = null;
+        if (submerged()) {
+            setFlag(false);
+            setInvisible(false);
+        }
     }
 }

@@ -507,4 +507,11 @@ public class LuciferDevil extends DevilEntity {
         if (source.getEntity() instanceof Player p && !p.isCreative()) return false;
         return super.hurt(source, amount);
     }
+
+    @Override
+    protected void onSkillInterrupted(int skill) {
+        super.onSkillInterrupted(skill);
+        setFlag(false);
+        branded.clear();
+    }
 }

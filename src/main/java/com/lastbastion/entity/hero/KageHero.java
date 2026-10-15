@@ -305,4 +305,10 @@ public class KageHero extends HeroEntity {
     public boolean isAlliedTo(Entity other) {
         return other instanceof KageHero || super.isAlliedTo(other);
     }
+
+    @Override
+    protected void onSkillInterrupted(int skill) {
+        super.onSkillInterrupted(skill);
+        setInvisible(false);
+    }
 }

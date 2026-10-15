@@ -27,6 +27,7 @@ public record ActionPacket(int action, int target, String id) {
     private static int recall(ServerLevel level, ServerPlayer p, HeroEntity h) {
         net.minecraft.world.phys.Vec3 at = com.lastbastion.entity.hero.Companions.safeSpotNear(level, h, p.position());
         level.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF, h.getX(), h.getY() + 1, h.getZ(), 12, 0.4, 0.6, 0.4, 0.02);
+        h.interruptSkill();
         h.teleportTo(at.x, at.y, at.z);
         h.getNavigation().stop();
         h.setMode(HeroMode.FOLLOW);

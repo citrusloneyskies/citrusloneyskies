@@ -438,7 +438,8 @@ public class BeelzebubDevil extends DevilEntity {
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
-        if (dissolved()) return false;
+        // untouchable mid-skill, but /kill and the void still apply
+        if (dissolved() && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) return false;
         return super.hurt(source, amount);
     }
 
@@ -470,5 +471,16 @@ public class BeelzebubDevil extends DevilEntity {
         entityData.set(GORGED, tag.getInt("lbGorged"));
         setInvisible(false);
         setInvulnerable(false);
+    }
+
+    @Override
+    protected void onSkillInterrupted(int skill) {
+        super.onSkillInterrupted(skill);
+        meal = null;
+        if (dissolved()) {
+            setFlag(false);
+            setInvisible(false);
+            setInvulnerable(false);
+        }
     }
 }

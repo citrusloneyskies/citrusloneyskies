@@ -674,4 +674,13 @@ public class MolochDevil extends DevilEntity {
         entityData.set(STOKED, Math.min(MAX_STOKE - 1, tag.getInt("lbStoked")));
         setFlag(false);
     }
+
+    @Override
+    protected void onSkillInterrupted(int skill) {
+        super.onSkillInterrupted(skill);
+        offering = null;
+        gored.clear();
+        pillars.clear();
+        if (skill == CHARGE) setDeltaMovement(0, getDeltaMovement().y, 0);
+    }
 }
