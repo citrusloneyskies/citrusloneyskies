@@ -350,7 +350,7 @@ public final class SiegeManager {
             }
             // stragglers glow so they can be hunted down
             if (d.queue.isEmpty() && d.waveTick % 600 == 0 && d.tracked.size() <= 6) {
-                for (UUID id : d.tracked) {
+                for (UUID id : new java.util.ArrayList<>(d.tracked)) {
                     if (level.getEntity(id) instanceof LivingEntity le) le.addEffect(new MobEffectInstance(MobEffects.GLOWING, 620, 0, false, false));
                 }
             }
@@ -358,7 +358,7 @@ public final class SiegeManager {
         }
         if (d.modifier == NightModifier.STORM && d.waveTick % 90 == 0) stormStrike(level, d);
         if (d.modifier == NightModifier.BLOOD_MOON && d.waveTick % 40 == 0) {
-            for (UUID id : d.tracked) {
+            for (UUID id : new java.util.ArrayList<>(d.tracked)) {
                 if (level.getEntity(id) instanceof SiegeZombie z) {
                     z.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, 60, 0, true, false));
                     z.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 60, 0, true, false));
@@ -668,7 +668,7 @@ public final class SiegeManager {
     }
 
     private static void clearEnemies(ServerLevel level, SiegeData d) {
-        for (UUID id : d.tracked) {
+        for (UUID id : new java.util.ArrayList<>(d.tracked)) {
             Entity e = level.getEntity(id);
             if (e != null) e.discard();
         }

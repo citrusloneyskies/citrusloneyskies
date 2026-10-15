@@ -279,7 +279,7 @@ public final class RaidEvents {
 
     /** Remove every live war-event entity (defeat, core removed). */
     public static void clear(ServerLevel level, SiegeData d) {
-        for (UUID id : d.raidEntities) {
+        for (UUID id : new java.util.ArrayList<>(d.raidEntities)) {
             Entity e = level.getEntity(id);
             if (e != null) e.discard();
         }
@@ -291,7 +291,7 @@ public final class RaidEvents {
     /** HUD objectives: live war events and downed teammates, OBJ_STRIDE ints each. */
     public static int[] objectives(ServerLevel level, SiegeData d) {
         List<Integer> out = new ArrayList<>();
-        for (UUID id : d.raidEntities) {
+        for (UUID id : new java.util.ArrayList<>(d.raidEntities)) {
             Entity e = level.getEntity(id);
             if (e == null || !e.isAlive()) continue;
             int type, value;

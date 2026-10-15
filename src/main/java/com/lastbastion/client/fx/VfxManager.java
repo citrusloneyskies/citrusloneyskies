@@ -301,10 +301,10 @@ public final class VfxManager {
         RNG.setSeed(fx.seed + (fx.age / 2) * 31L);
         Vec3 from = a(fx), to = b(fx);
         float thick = fx.p.size();
-        drawBolt(d, from, to, thick, fx.p.color(), fade, RNG, fx.p.extra(), 0);
+        drawBolt(d, from, to, thick, fx.p.color(), hot(fx), fade, RNG, fx.p.extra(), 0);
     }
 
-    private static void drawBolt(Draw d, Vec3 from, Vec3 to, float thick, int color, float fade, RandomSource r, float branch, int depth) {
+    private static void drawBolt(Draw d, Vec3 from, Vec3 to, float thick, int color, int core, float fade, RandomSource r, float branch, int depth) {
         Vec3 dv = to.subtract(from);
         double len = dv.length();
         if (len < 0.05) return;
@@ -323,10 +323,10 @@ public final class VfxManager {
             Vector3f a = d.rel(prev), b = d.rel(next);
             d.ribbon(a, b, thick * 5, thick * 5, color, 0.18f * fade, 0.18f * fade);
             d.ribbon(a, b, thick * 2, thick * 2, color, 0.7f * fade, 0.7f * fade);
-            d.ribbon(a, b, thick * 0.8f, thick * 0.8f, hot(fx), fade, fade);
+            d.ribbon(a, b, thick * 0.8f, thick * 0.8f, core, fade, fade);
             if (depth < 2 && i < n - 1 && r.nextFloat() < branch * 0.22f) {
                 Vec3 bdir = dir.add(p1.scale((r.nextDouble() - 0.5) * 2.2)).add(p2.scale((r.nextDouble() - 0.5) * 2.2)).normalize();
-                drawBolt(d, next, next.add(bdir.scale(len * (0.15 + r.nextDouble() * 0.2))), thick * 0.6f, color, fade * 0.8f, r, branch * 0.5f, depth + 1);
+                drawBolt(d, next, next.add(bdir.scale(len * (0.15 + r.nextDouble() * 0.2))), thick * 0.6f, color, core, fade * 0.8f, r, branch * 0.5f, depth + 1);
             }
             prev = next;
         }

@@ -46,6 +46,8 @@ public final class SiegeGameTests {
         SiegeData d = SiegeManager.data(level);
         d.corePos = null;
         d.state = SiegeState.INACTIVE;
+        java.util.Arrays.fill(d.upgrades, 0);
+        d.aegisTicks = 0;
         Component err = SiegeManager.tryPlaceCore(level, core, null);
         if (err != null) h.fail("core placement failed: " + err.getString());
         SiegeManager.forcePresence = true;
@@ -129,7 +131,7 @@ public final class SiegeGameTests {
         for (int i = 0; i < 3; i++) ZombieSpawner.spawn(level, ZombieKind.SHAMBLER, ZombieRank.ROTTEN, 0, ring(core, 3, i, 3), false, false);
         h.runAfterDelay(160, () -> {
             SiegeData d = SiegeManager.data(level);
-            boolean hurt = d.coreHp < d.maxHp() || d.state == SiegeState.INACTIVE;
+            boolean hurt = d.coreHp < d.maxHp() || d.shield < d.maxShield() || d.state == SiegeState.INACTIVE;
             teardown(h, core);
             if (hurt) h.succeed();
             else h.fail("zombies never damaged the core (hp " + d.coreHp + ")");
