@@ -9,7 +9,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class Net {
-    private static final String PROTOCOL = "4";
+    private static final String PROTOCOL = "5";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(new ResourceLocation(LastBastion.MODID, "main"),
             () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
 
@@ -40,6 +40,12 @@ public final class Net {
                 .encoder(GunReloadPacket::encode).decoder(GunReloadPacket::new).consumerMainThread(GunReloadPacket::handle).add();
         CHANNEL.messageBuilder(ArmorJetPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ArmorJetPacket::encode).decoder(ArmorJetPacket::new).consumerMainThread(ArmorJetPacket::handle).add();
+        CHANNEL.messageBuilder(DownedPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(DownedPacket::encode).decoder(DownedPacket::new).consumerMainThread(DownedPacket::handle).add();
+        CHANNEL.messageBuilder(RulesPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(RulesPacket::encode).decoder(RulesPacket::new).consumerMainThread(RulesPacket::handle).add();
+        CHANNEL.messageBuilder(RulesApplyPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(RulesApplyPacket::encode).decoder(RulesApplyPacket::new).consumerMainThread(RulesApplyPacket::handle).add();
     }
 
     public static void sendTo(ServerPlayer player, Object msg) {

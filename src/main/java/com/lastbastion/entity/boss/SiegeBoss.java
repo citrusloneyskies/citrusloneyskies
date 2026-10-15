@@ -110,9 +110,10 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
         SiegeBoss b = kind.type().get().create(level);
         if (b == null) return null;
         b.moveTo(pos.x, pos.y, pos.z, level.random.nextFloat() * 360, 0);
-        float scale = (float) ((1 + 0.08 * Math.max(0, wave - 5)) * (1 + 0.6 * (players - 1)) * Math.sqrt(SiegeConfig.DIFFICULTY.get()));
+        com.lastbastion.siege.SiegeRules rules = com.lastbastion.siege.SiegeManager.data(level).rules;
+        float scale = (float) ((1 + 0.08 * Math.max(0, wave - 5)) * (1 + 0.6 * (players - 1)) * rules.get(com.lastbastion.siege.SiegeRules.BOSS_HEALTH));
         b.getAttribute(Attributes.MAX_HEALTH).setBaseValue(kind.hp * scale);
-        b.damageScale = (float) ((1 + 0.03 * Math.max(0, wave - 5)) * Math.sqrt(SiegeConfig.DIFFICULTY.get()));
+        b.damageScale = (float) ((1 + 0.03 * Math.max(0, wave - 5)) * rules.get(com.lastbastion.siege.SiegeRules.ENEMY_DAMAGE));
         b.getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(kind.damage * b.damageScale);
         b.setHealth(b.getMaxHealth());
         b.finalizeSpawn(level, level.getCurrentDifficultyAt(b.blockPosition()), MobSpawnType.EVENT, null, null);
@@ -645,6 +646,7 @@ public abstract class SiegeBoss extends Monster implements SiegeEnemy {
                 Vfx.screenFlash(sl, position(), 0xFFF4D0, 0.35f, 80, 12);
                 Vfx.spray(sl, FxStyle.SOUL, position().add(0, 1, 0), 0xFFFFFF, dangerColor(), 0.5f, 40, 0.3f, 1);
                 level().broadcastEntityEvent(this, (byte) 60);
+                com.lastbastion.siege.raid.RaidEvents.dropToken(sl, position().add(0, 1, 0), 1);
                 remove(RemovalReason.KILLED);
             }
         }

@@ -60,6 +60,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     private static final EntityDataAccessor<Integer> RISE = SynchedEntityData.defineId(SiegeZombie.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> SHIELD = SynchedEntityData.defineId(SiegeZombie.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> STATE = SynchedEntityData.defineId(SiegeZombie.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> WARLORD = SynchedEntityData.defineId(SiegeZombie.class, EntityDataSerializers.BOOLEAN);
 
     public static final int RISE_TICKS = 30;
     private static final UUID HASTE_ID = UUID.fromString("0b6f5a52-91f3-4f43-8c0e-1fa3b1d0a201");
@@ -109,13 +110,14 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
         entityData.define(RISE, 0);
         entityData.define(SHIELD, 0f);
         entityData.define(STATE, false);
+        entityData.define(WARLORD, false);
     }
 
     @Override
     public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
         super.onSyncedDataUpdated(key);
         if (anim != null) anim.onSync(key);
-        if (RANK.equals(key) || AFFIXES.equals(key)) updateSize();
+        if (RANK.equals(key) || AFFIXES.equals(key) || WARLORD.equals(key)) updateSize();
         if (RISE.equals(key) && level().isClientSide && entityData.get(RISE) > 0) clientRiseStart = tickCount;
     }
 
@@ -170,6 +172,75 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
             setCustomName(name);
             setCustomNameVisible(true);
         }
+    }
+
+    // ------------------------------------------------------------------ warlords
+
+    @Nullable
+    private net.minecraft.server.level.ServerBossEvent warlordBar;
+
+    public boolean isWarlord() {
+        return entityData.get(WARLORD);
+    }
+
+    /**
+     * Promote this zombie to a Warlord: a named, bigger, much tougher elite with its own boss bar that
+     * rallies nearby zombies and drops a Warforged Token.
+     */
+    public void makeWarlord(String title) {
+        if (isWarlord()) return;
+        entityData.set(WARLORD, true);
+        damageScale *= 1.4f;
+        getAttribute(Attributes.MAX_HEALTH).setBaseValue(getMaxHealth() * 2.5);
+        getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(kind.damage * damageScale);
+        getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(0.9);
+        setHealth(getMaxHealth());
+        Component name = Component.literal("Warlord " + title).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+        setCustomName(name);
+        setCustomNameVisible(true);
+        setGlowingTag(true);
+        updateSize();
+    }
+
+    private net.minecraft.server.level.ServerBossEvent warlordBar() {
+        if (warlordBar == null) {
+            warlordBar = new net.minecraft.server.level.ServerBossEvent(getDisplayName(), net.minecraft.world.BossEvent.BossBarColor.YELLOW,
+                    net.minecraft.world.BossEvent.BossBarOverlay.NOTCHED_6);
+        }
+        return warlordBar;
+    }
+
+    private void warlordTick(ServerLevel level) {
+        var bar = warlordBar();
+        bar.setProgress(Math.max(0, getHealth() / getMaxHealth()));
+        if (tickCount % 10 == 0) {
+            for (net.minecraft.server.level.ServerPlayer p : level.players()) {
+                boolean near = p.distanceToSqr(this) < 64 * 64;
+                if (near && !bar.getPlayers().contains(p)) bar.addPlayer(p);
+                else if (!near && bar.getPlayers().contains(p)) bar.removePlayer(p);
+            }
+        }
+        if (tickCount % 40 == 0) {
+            boolean any = false;
+            for (SiegeZombie z : level.getEntitiesOfClass(SiegeZombie.class, getBoundingBox().inflate(8), z -> z != this && z.isAlive())) {
+                z.addEffect(new MobEffectInstance(net.minecraft.world.effect.MobEffects.MOVEMENT_SPEED, 60, 0, true, false));
+                z.addEffect(new MobEffectInstance(net.minecraft.world.effect.MobEffects.DAMAGE_BOOST, 60, 0, true, false));
+                any = true;
+            }
+            if (any) com.lastbastion.fx.Vfx.ring(level, position().add(0, 0.1, 0), 0xFFB000, 8f, 14, 0.5f);
+        }
+    }
+
+    @Override
+    public void stopSeenByPlayer(net.minecraft.server.level.ServerPlayer player) {
+        super.stopSeenByPlayer(player);
+        if (warlordBar != null) warlordBar.removePlayer(player);
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        if (warlordBar != null) warlordBar.removeAllPlayers();
+        super.remove(reason);
     }
 
     /** Force this zombie to fight {@code by} for {@code ticks} (hero taunts). */
@@ -279,12 +350,13 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     public int creditValue() {
         float v = kind.credits * rank().creditMult;
         if (isChampion()) v *= 3f;
+        if (isWarlord()) v *= 4f;
         return Math.max(1, Math.round(v));
     }
 
     @Override
     public boolean isHighPriority() {
-        return isChampion();
+        return isChampion() || isWarlord();
     }
 
     @Override
@@ -379,6 +451,10 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
 
     @Override
     public void die(DamageSource source) {
+        if (!level().isClientSide && level() instanceof ServerLevel sl && isWarlord()) {
+            if (warlordBar != null) warlordBar.removeAllPlayers();
+            com.lastbastion.siege.raid.RaidEvents.onWarlordSlain(sl, this, source);
+        }
         if (!level().isClientSide && level() instanceof ServerLevel sl) {
             if (hasAffix(Affix.SPLITTING)) {
                 for (int i = 0; i < 2; i++) {
@@ -404,6 +480,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     public void aiStep() {
         super.aiStep();
         if (level() instanceof ServerLevel sl) {
+            if (isWarlord() && isAlive()) warlordTick(sl);
             if (!isNoAi()) serverTick(sl);
         } else if (isRising()) {
             BlockState below = level().getBlockState(blockPosition().below());
@@ -514,7 +591,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
     }
 
     private void updateSize() {
-        sizeScale = rank().scale * (Affix.JUGGERNAUT.in(affixes()) ? 1.25f : 1f) * baseScale();
+        sizeScale = rank().scale * (Affix.JUGGERNAUT.in(affixes()) ? 1.25f : 1f) * (entityData.get(WARLORD) ? 1.3f : 1f) * baseScale();
         refreshDimensions();
     }
 
@@ -537,6 +614,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
         tag.putFloat("lbShield", shield());
         tag.putBoolean("lbRevived", revived);
         tag.putBoolean("lbMinion", minion);
+        tag.putBoolean("lbWarlord", isWarlord());
     }
 
     @Override
@@ -549,6 +627,7 @@ public class SiegeZombie extends Monster implements SiegeEnemy {
         entityData.set(SHIELD, tag.getFloat("lbShield"));
         revived = tag.getBoolean("lbRevived");
         minion = tag.getBoolean("lbMinion");
+        entityData.set(WARLORD, tag.getBoolean("lbWarlord"));
         updateSize();
     }
 

@@ -38,6 +38,9 @@ public final class ModEntities {
     public static final RegistryObject<EntityType<SentryDroneEntity>> DRONE = reg("sentry_drone", SentryDroneEntity::new, MobCategory.MISC, 0.6f, 0.5f, 10);
     public static final RegistryObject<EntityType<DropPodEntity>> DROP_POD = reg("drop_pod", DropPodEntity::new, MobCategory.MISC, 1.6f, 3.0f, 16);
     public static final RegistryObject<EntityType<TitanExoEntity>> TITAN_EXO = reg("titan_exosuit", TitanExoEntity::new, MobCategory.MISC, 1.6f, 3.4f, 10);
+    public static final RegistryObject<EntityType<com.lastbastion.entity.misc.SupplyCrateEntity>> SUPPLY_CRATE =
+            reg("supply_crate", com.lastbastion.entity.misc.SupplyCrateEntity::new, MobCategory.MISC, 1.0f, 1.0f, 16);
+    public static final RegistryObject<EntityType<RiftEntity>> RIFT = reg("corruption_rift", RiftEntity::new, MobCategory.MONSTER, 1.6f, 3.4f, 16);
 
     static {
         ZOMBIES.put(ZombieKind.SHAMBLER, reg("shambler", ShamblerZombie::new, MobCategory.MONSTER, 0.6f, 1.95f, 10));
@@ -111,6 +114,7 @@ public final class ModEntities {
         e.put(PHYLACTERY.get(), PhylacteryEntity.createAttributes().build());
         e.put(DRONE.get(), SentryDroneEntity.createAttributes().build());
         e.put(TITAN_EXO.get(), TitanExoEntity.createAttributes().build());
+        e.put(RIFT.get(), RiftEntity.createAttributes().build());
     }
 
     private ModEntities() {

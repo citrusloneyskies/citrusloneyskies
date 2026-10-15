@@ -49,6 +49,8 @@ public final class ClientSetup {
         e.registerEntityRenderer(ModEntities.DROP_POD.get(), MiscModels::podRenderer);
         e.registerEntityRenderer(ModEntities.TITAN_EXO.get(), MiscModels::exoRenderer);
         e.registerEntityRenderer(ModEntities.DRONE.get(), MiscModels::droneRenderer);
+        e.registerEntityRenderer(ModEntities.SUPPLY_CRATE.get(), com.lastbastion.client.model.RaidModels::crateRenderer);
+        e.registerEntityRenderer(ModEntities.RIFT.get(), com.lastbastion.client.model.RaidModels::riftRenderer);
         e.registerBlockEntityRenderer(ModBlockEntities.SIEGE_CORE.get(), CoreCrystalRenderer::new);
     }
 

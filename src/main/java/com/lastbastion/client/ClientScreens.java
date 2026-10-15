@@ -30,4 +30,13 @@ public final class ClientScreens {
             }
         }
     }
+
+    public static void rules(com.lastbastion.network.RulesPacket p) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof com.lastbastion.client.screen.RulesScreen rs) {
+            rs.refresh(p.rules(), p.canEdit());
+        } else if (p.open()) {
+            mc.setScreen(new com.lastbastion.client.screen.RulesScreen(p.rules(), p.canEdit()));
+        }
+    }
 }

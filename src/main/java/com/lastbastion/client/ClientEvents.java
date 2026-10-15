@@ -38,6 +38,7 @@ public final class ClientEvents {
         if (mc.player == null) return;
         if (!mc.isPaused()) com.lastbastion.client.fx.VfxManager.tick();
         ClientSiegeState.tick();
+        ClientDowned.tick();
         while (ClientSetup.HERO_COMMAND.consumeClick()) {
             if (mc.screen == null) mc.setScreen(new HeroCommandScreen());
         }
@@ -60,13 +61,22 @@ public final class ClientEvents {
         }
     }
 
-    /** While piloting the exosuit, attack/use drive the weapons instead of punching. */
-    @SubscribeEvent
+    /** While piloting the exosuit, attack/use drive the weapons instead of punching; while downed, nothing works. */
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.HIGHEST)
     public static void onInteract(InputEvent.InteractionKeyMappingTriggered e) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && mc.player.getVehicle() instanceof TitanExoEntity) {
+        if (mc.player != null && (mc.player.getVehicle() instanceof TitanExoEntity || ClientDowned.isDowned(mc.player))) {
             e.setCanceled(true);
             e.setSwingHand(false);
+        }
+    }
+
+    /** Downed players crawl: no jumping, no sneaking. */
+    @SubscribeEvent
+    public static void onMovementInput(net.minecraftforge.client.event.MovementInputUpdateEvent e) {
+        if (ClientDowned.isDowned(e.getEntity())) {
+            e.getInput().jumping = false;
+            e.getInput().shiftKeyDown = false;
         }
     }
 
@@ -75,6 +85,7 @@ public final class ClientEvents {
         if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         com.lastbastion.client.fx.VfxManager.render(e);
         renderSpeech(e);
+        renderDowned(e);
         if (ClientSiegeState.POPUPS.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         Camera cam = e.getCamera();
@@ -95,6 +106,40 @@ public final class ClientEvents {
             Matrix4f m = pose.last().pose();
             int a = (int) (alpha * 255) << 24;
             font.drawInBatch(text, -font.width(text) / 2f, 0, a | 0xFFD966, false, m, buf, Font.DisplayMode.SEE_THROUGH, 0, LightTexture.FULL_BRIGHT);
+            pose.popPose();
+        }
+        buf.endBatch();
+    }
+
+    /** "DOWNED" labels with the bleed-out timer and revive progress over downed teammates. */
+    private static void renderDowned(RenderLevelStageEvent e) {
+        if (ClientDowned.DOWNED.isEmpty()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null) return;
+        Camera cam = e.getCamera();
+        Vec3 cp = cam.getPosition();
+        PoseStack pose = e.getPoseStack();
+        MultiBufferSource.BufferSource buf = mc.renderBuffers().bufferSource();
+        Font font = mc.font;
+        float pt = e.getPartialTick();
+        boolean blink = (mc.level.getGameTime() / 8) % 2 == 0;
+        for (var en : ClientDowned.DOWNED.entrySet()) {
+            net.minecraft.world.entity.Entity ent = mc.level.getEntity(en.getKey());
+            if (ent == null || ent == mc.player || ent.distanceToSqr(cp) > 96 * 96) continue;
+            ClientDowned.State s = en.getValue();
+            Vec3 p = ent.getPosition(pt).add(0, 1.1, 0);
+            pose.pushPose();
+            pose.translate(p.x - cp.x, p.y - cp.y, p.z - cp.z);
+            pose.mulPose(cam.rotation());
+            float sc = 0.028f;
+            pose.scale(-sc, -sc, sc);
+            Matrix4f m = pose.last().pose();
+            String text = "\u2716 DOWNED " + (s.bleed + 19) / 20 + "s";
+            font.drawInBatch(text, -font.width(text) / 2f, 0, blink ? 0xFFFF4040 : 0xFFFFA0A0, false, m, buf, Font.DisplayMode.SEE_THROUGH,
+                    0x90000000, LightTexture.FULL_BRIGHT);
+            String hint = s.revive > 0 ? "reviving " + Math.round(100f * s.revive / com.lastbastion.siege.raid.Downed.REVIVE_TICKS) + "%" : "crouch beside to revive";
+            font.drawInBatch(hint, -font.width(hint) / 2f, 11, s.revive > 0 ? 0xFFFFD040 : 0xFFC0C0C0, false, m, buf, Font.DisplayMode.SEE_THROUGH,
+                    0x90000000, LightTexture.FULL_BRIGHT);
             pose.popPose();
         }
         buf.endBatch();

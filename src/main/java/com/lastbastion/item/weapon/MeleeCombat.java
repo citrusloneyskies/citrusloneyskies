@@ -117,7 +117,7 @@ public final class MeleeCombat {
      */
     public static boolean swing(ServerLevel level, ServerPlayer p, boolean force) {
         ItemStack stack = p.getMainHandItem();
-        if (!(stack.getItem() instanceof MeleeWeaponItem w) || p.isSpectator()) return false;
+        if (!(stack.getItem() instanceof MeleeWeaponItem w) || p.isSpectator() || com.lastbastion.siege.raid.Downed.isDowned(p)) return false;
         WeaponKind k = w.kind;
         State st = state(p);
         long now = level.getGameTime();

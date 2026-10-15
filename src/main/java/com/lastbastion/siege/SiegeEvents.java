@@ -62,6 +62,11 @@ public final class SiegeEvents {
     }
 
     @SubscribeEvent
+    public static void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent e) {
+        com.lastbastion.siege.raid.Downed.reset();
+    }
+
+    @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
         SiegeCommands.register(e.getDispatcher());
     }

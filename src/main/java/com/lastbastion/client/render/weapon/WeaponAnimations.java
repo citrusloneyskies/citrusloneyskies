@@ -109,7 +109,7 @@ public final class WeaponAnimations {
     }
 
     static void trySwing(LocalPlayer p, WeaponKind k) {
-        if (p.isUsingItem() || ticks - lastSent < 3) return;
+        if (p.isUsingItem() || ticks - lastSent < 3 || com.lastbastion.client.ClientDowned.isDowned(p)) return;
         lastSent = ticks;
         float strength = p.getAttackStrengthScale(0.5f);
         boolean strong = strength > 0.7f;

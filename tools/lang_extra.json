@@ -1,4 +1,6 @@
 {
+  "entity.lastbastion.corruption_rift": "Corruption Rift",
+  "entity.lastbastion.supply_crate": "Supply Drop",
   "item.lastbastion.arcanist_boots": "Arcanist Slippers",
   "item.lastbastion.arcanist_chestplate": "Arcanist Robe",
   "item.lastbastion.arcanist_helmet": "Arcanist Circlet",
@@ -31,5 +33,6 @@
   "item.lastbastion.vanguard_helmet": "Vanguard Greathelm",
   "item.lastbastion.vanguard_leggings": "Vanguard Greaves",
   "item.lastbastion.voidedge": "Voidedge",
+  "item.lastbastion.warforged_token": "Warforged Token",
   "key.lastbastion.reload": "Reload Weapon"
 }

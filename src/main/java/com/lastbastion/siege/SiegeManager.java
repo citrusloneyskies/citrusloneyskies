@@ -25,6 +25,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
@@ -79,6 +80,25 @@ public final class SiegeManager {
         return t >= 13000L && t < 23000L;
     }
 
+    public static int presenceRadius() {
+        return SiegeConfig.PLAYER_PRESENCE_RADIUS.get();
+    }
+
+    /** Players taking part in the siege (within the presence radius of the core). */
+    public static int presentPlayers(ServerLevel level, BlockPos core) {
+        return playersNear(level, core, presenceRadius()).size();
+    }
+
+    /** Is this player in the core's dimension and within the presence radius? */
+    public static boolean withinSiege(ServerLevel level, net.minecraft.world.entity.player.Player p) {
+        BlockPos core = corePos(level);
+        return core != null && p.level() == level && p.position().distanceToSqr(Vec3.atCenterOf(core)) <= (double) presenceRadius() * presenceRadius();
+    }
+
+    public static SiegeRules rules(ServerLevel level) {
+        return data(level).rules;
+    }
+
     public static List<ServerPlayer> playersNear(ServerLevel level, BlockPos core, double radius) {
         List<ServerPlayer> out = new ArrayList<>();
         Vec3 c = Vec3.atCenterOf(core);
@@ -106,14 +126,17 @@ public final class SiegeManager {
         d.queue.clear();
         d.tracked.clear();
         d.calledEarly = false;
+        d.victorious = false;
+        d.prepTicks = d.rules.i(SiegeRules.PREP_SECONDS) * 20;
         wasNight = isNight(level);
+        planNext(level, d);
         d.setDirty();
         Vec3 c = Vec3.atCenterOf(pos);
         Fx.skyBeam(level, c, 0x6FE3FF, 40, 1.5);
         level.playSound(null, pos, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.5f, 0.8f);
         for (ServerPlayer p : playersNear(level, pos, 64)) {
             title(p, Component.literal("THE SIEGE BEGINS").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
-                    Component.literal("Defend the core. Wave " + d.wave + " arrives at nightfall.").withStyle(ChatFormatting.GRAY));
+                    Component.literal("Defend the core. Wave " + d.wave + " arrives " + arrivalText(d) + ".").withStyle(ChatFormatting.GRAY));
         }
         return null;
     }
@@ -122,8 +145,12 @@ public final class SiegeManager {
         SiegeData d = data(level);
         if (!isCoreLevel(level, d) || !pos.equals(d.corePos)) return;
         clearEnemies(level, d);
+        com.lastbastion.siege.raid.RaidEvents.clear(level, d);
+        com.lastbastion.siege.raid.Downed.reviveAll(level);
         d.state = SiegeState.INACTIVE;
         d.corePos = null;
+        d.nextQueue.clear();
+        d.nextWave = 0;
         d.setDirty();
     }
 
@@ -147,7 +174,7 @@ public final class SiegeManager {
             onCoreRemoved(level, core);
             return;
         }
-        boolean present = forcePresence || !playersNear(level, core, SiegeConfig.PLAYER_PRESENCE_RADIUS.get()).isEmpty();
+        boolean present = forcePresence || !playersNear(level, core, presenceRadius()).isEmpty();
         long gt = level.getGameTime();
         boolean night = isNight(level);
 
@@ -180,7 +207,26 @@ public final class SiegeManager {
         }
 
         if (d.state == SiegeState.PREPARING) {
-            if (present && night && !wasNight) startWave(level, d, false);
+            if (d.nextWave != d.wave && gt % 20 == 0) planNext(level, d);
+            switch (d.rules.trigger()) {
+                case SiegeRules.TRIGGER_NIGHT -> {
+                    if (present && night && !wasNight) startWave(level, d, false);
+                }
+                case SiegeRules.TRIGGER_TIMER -> {
+                    if (present && --d.prepTicks <= 0) startWave(level, d, false);
+                    else if (present && d.prepTicks % 20 == 0) {
+                        int secs = d.prepTicks / 20;
+                        if (secs == 30 || secs == 10 || (secs <= 5 && secs > 0)) {
+                            for (ServerPlayer p : playersNear(level, core, 256)) {
+                                p.displayClientMessage(Component.literal("Wave " + d.wave + " in " + secs + "s").withStyle(ChatFormatting.GOLD), true);
+                                p.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.MASTER, 0.8f, secs <= 5 ? 1.6f : 1f);
+                            }
+                        }
+                    }
+                }
+                default -> {
+                }
+            }
         } else if (d.state == SiegeState.WAVE && present) {
             tickWave(level, d, core);
         }
@@ -194,7 +240,7 @@ public final class SiegeManager {
     public static void callWaveEarly(ServerLevel level, ServerPlayer by) {
         SiegeData d = data(level);
         if (d.state != SiegeState.PREPARING || !isCoreLevel(level, d)) return;
-        if (!isNight(level) && level.getGameRules().getBoolean(net.minecraft.world.level.GameRules.RULE_DAYLIGHT)) {
+        if (d.rules.trigger() == SiegeRules.TRIGGER_NIGHT && !isNight(level) && level.getGameRules().getBoolean(net.minecraft.world.level.GameRules.RULE_DAYLIGHT)) {
             long day = level.getDayTime();
             level.setDayTime(day - day % 24000L + 13000L);
         }
@@ -203,23 +249,47 @@ public final class SiegeManager {
         broadcast(level, d, Component.literal(by.getGameProfile().getName() + " sounded the war horn early! (+25% wave bonus)").withStyle(ChatFormatting.GOLD));
     }
 
+    /** Plan the coming wave now so the war room and HUD can show intel on it while you prepare. */
+    public static void planNext(ServerLevel level, SiegeData d) {
+        BlockPos core = d.corePos;
+        if (core == null) return;
+        int players = Math.max(1, presentPlayers(level, core));
+        d.nextModifier = rollModifier(level, d);
+        d.nextQueue.clear();
+        d.nextQueue.addAll(WavePlanner.plan(d.rules, d.wave, players, d.nextModifier, level.random));
+        d.nextWave = d.wave;
+        d.nextPlayers = players;
+        d.setDirty();
+    }
+
     public static void startWave(ServerLevel level, SiegeData d, boolean early) {
         BlockPos core = d.corePos;
         if (core == null) return;
-        int players = Math.max(1, playersNear(level, core, SiegeConfig.PLAYER_PRESENCE_RADIUS.get()).size());
-        d.modifier = rollModifier(level, d);
+        int players = Math.max(1, presentPlayers(level, core));
+        if (d.nextWave != d.wave || d.nextQueue.isEmpty()) {
+            planNext(level, d);
+        } else if (players != d.nextPlayers) {
+            // the party changed since the forecast: keep the night, re-size the horde
+            d.nextQueue.clear();
+            d.nextQueue.addAll(WavePlanner.plan(d.rules, d.wave, players, d.nextModifier, level.random));
+        }
+        d.modifier = d.nextModifier;
         d.lastModifier = d.modifier;
         d.queue.clear();
-        d.queue.addAll(WavePlanner.plan(d.wave, players, d.modifier, level.random));
+        d.queue.addAll(d.nextQueue);
+        d.nextQueue.clear();
+        d.nextWave = 0;
         d.tracked.clear();
         d.waveTick = 0;
         d.waveTotal = WavePlanner.count(d.queue);
         d.waveKilled = 0;
         d.calledEarly = early;
+        d.coreHit = false;
         d.state = SiegeState.WAVE;
+        com.lastbastion.siege.raid.RaidEvents.plan(level, d);
         d.setDirty();
         if (d.modifier == NightModifier.STORM) level.setWeatherParameters(0, 12000, true, true);
-        boolean boss = WavePlanner.isBossWave(d.wave);
+        boolean boss = d.rules.isBossWave(d.wave);
         Component t = Component.literal("WAVE " + d.wave).withStyle(boss ? ChatFormatting.DARK_RED : ChatFormatting.RED, ChatFormatting.BOLD);
         Component sub = d.modifier != NightModifier.NONE
                 ? Component.literal(d.modifier.title + " - " + d.modifier.desc).withStyle(s -> s.withColor(d.modifier.color))
@@ -231,16 +301,31 @@ public final class SiegeManager {
     }
 
     private static NightModifier rollModifier(ServerLevel level, SiegeData d) {
-        if (!SiegeConfig.NIGHT_MODIFIERS.get() || d.wave < 6 || level.random.nextFloat() > 0.35f || d.lastModifier != NightModifier.NONE) {
-            return NightModifier.NONE;
-        }
-        NightModifier[] all = NightModifier.values();
-        return all[1 + level.random.nextInt(all.length - 1)];
+        SiegeRules r = d.rules;
+        if (!r.on(SiegeRules.NIGHT_TWISTS) || d.wave < r.i(SiegeRules.TWIST_START)) return NightModifier.NONE;
+        int chance = r.i(SiegeRules.TWIST_CHANCE);
+        if (level.random.nextInt(100) >= chance || (d.lastModifier != NightModifier.NONE && chance < 100)) return NightModifier.NONE;
+        List<NightModifier> pool = new ArrayList<>();
+        for (NightModifier m : NightModifier.values()) if (m != NightModifier.NONE && r.twistEnabled(m)) pool.add(m);
+        return pool.isEmpty() ? NightModifier.NONE : pool.get(level.random.nextInt(pool.size()));
+    }
+
+    /** "at nightfall", "in 3:00" or "when you sound the war horn". */
+    public static String arrivalText(SiegeData d) {
+        return switch (d.rules.trigger()) {
+            case SiegeRules.TRIGGER_TIMER -> {
+                int secs = Math.max(0, d.prepTicks / 20);
+                yield "in " + secs / 60 + ":" + String.format("%02d", secs % 60);
+            }
+            case SiegeRules.TRIGGER_MANUAL -> "when you sound the war horn";
+            default -> "at nightfall";
+        };
     }
 
     private static void tickWave(ServerLevel level, SiegeData d, BlockPos core) {
         d.waveTick++;
-        int maxAlive = SiegeConfig.MAX_ALIVE.get();
+        com.lastbastion.siege.raid.RaidEvents.tick(level, d, core);
+        int maxAlive = d.rules.i(SiegeRules.MAX_ALIVE);
         while (!d.queue.isEmpty() && d.queue.get(0).tick <= d.waveTick && d.tracked.size() < maxAlive) {
             WavePlanner.Group g = d.queue.remove(0);
             spawnGroup(level, d, core, g);
@@ -282,12 +367,12 @@ public final class SiegeManager {
         Vec3 p = target.position();
         Fx.bolt(level, p.add(level.random.nextGaussian() * 3, 30, level.random.nextGaussian() * 3), p, 0xEFF6FF, 1.4f);
         level.playSound(null, target.blockPosition(), SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, 3f, 1f);
-        SiegeDamage.areaDamage(level, p, 3, 12 * WavePlanner.damageScale(d.wave), Element.LIGHTNING, null, null, true);
+        SiegeDamage.areaDamage(level, p, 3, 12 * WavePlanner.damageScale(d.rules, d.wave), Element.LIGHTNING, null, null, true);
     }
 
     private static void spawnGroup(ServerLevel level, SiegeData d, BlockPos core, WavePlanner.Group g) {
-        int radius = SiegeConfig.SPAWN_RADIUS.get();
-        float hp = WavePlanner.hpScale(d.wave), dmg = WavePlanner.damageScale(d.wave);
+        int radius = d.rules.i(SiegeRules.SPAWN_RADIUS);
+        float hp = WavePlanner.hpScale(d.rules, d.wave), dmg = WavePlanner.damageScale(d.rules, d.wave);
         if (d.modifier == NightModifier.BLOOD_MOON) dmg *= 1.25f;
         for (WavePlanner.Unit u : g.units) {
             double a = g.angle + (level.random.nextDouble() - 0.5) * 0.3;
@@ -296,7 +381,7 @@ public final class SiegeManager {
             Entity spawned;
             if (u.isBoss()) {
                 BossKind bk = BossKind.values()[u.kind() - WavePlanner.BOSS_OFFSET];
-                int players = Math.max(1, playersNear(level, core, SiegeConfig.PLAYER_PRESENCE_RADIUS.get()).size());
+                int players = Math.max(1, presentPlayers(level, core));
                 spawned = SiegeBoss.spawn(level, bk, pos, d.wave, players);
                 if (spawned != null) announceBoss(level, core, bk);
             } else {
@@ -339,14 +424,46 @@ public final class SiegeManager {
 
     private static void completeWave(ServerLevel level, SiegeData d, BlockPos core) {
         int cleared = d.wave;
-        float bonusBase = (50 + 20 * cleared) * (d.calledEarly ? 1.25f : 1f);
-        List<ServerPlayer> players = playersNear(level, core, SiegeConfig.PLAYER_PRESENCE_RADIUS.get());
+        boolean perfect = !d.coreHit;
+        float perfectMult = perfect ? 1f + d.rules.i(SiegeRules.PERFECT_BONUS) / 100f : 1f;
+        float bonusBase = (50 + 20 * cleared) * (d.calledEarly ? 1.25f : 1f) * perfectMult;
+        boolean milestone = cleared % 10 == 0;
+        int victoryWave = d.rules.i(SiegeRules.VICTORY_WAVE);
+        boolean victory = victoryWave > 0 && cleared >= victoryWave && !d.victorious;
+        List<ServerPlayer> players = playersNear(level, core, presenceRadius());
         for (ServerPlayer p : players) {
             int got = award(level, d, p.getUUID(), bonusBase, null, false);
-            title(p, Component.literal("WAVE " + cleared + " CLEARED").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD),
-                    Component.literal("+" + got + " credits").withStyle(ChatFormatting.YELLOW));
-            p.playNotifySound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1f, 1f);
+            MutableComponent sub = Component.literal("+" + got + " credits").withStyle(ChatFormatting.YELLOW);
+            if (perfect) sub = Component.literal("PERFECT DEFENCE   ").withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD).append(sub);
+            if (victory) {
+                title(p, Component.literal("VICTORY").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                        Component.literal("The Last Bastion stands! Wave " + cleared + " survived.").withStyle(ChatFormatting.YELLOW));
+                p.playNotifySound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1f, 0.8f);
+            } else {
+                title(p, Component.literal("WAVE " + cleared + " CLEARED").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD), sub);
+                p.playNotifySound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1f, 1f);
+            }
+            int tokens = (milestone ? 1 : 0) + (victory ? 3 : 0);
+            if (tokens > 0) {
+                net.minecraft.world.item.ItemStack t = new net.minecraft.world.item.ItemStack(ModItems.WARFORGED_TOKEN.get(), tokens);
+                if (!p.getInventory().add(t)) p.drop(t, false);
+            }
         }
+        if (perfect) broadcast(level, d, Component.literal("\u2726 Perfect defence! The core's hull was never touched (+"
+                + d.rules.i(SiegeRules.PERFECT_BONUS) + "% wave bonus).").withStyle(ChatFormatting.AQUA));
+        if (milestone && !victory) {
+            broadcast(level, d, Component.literal("\u2605 MILESTONE: " + cleared + " waves survived! Every defender receives a Warforged Token.")
+                    .withStyle(ChatFormatting.GOLD));
+            celebrate(level, core, 0xFFD966);
+        }
+        if (victory) {
+            d.victorious = true;
+            broadcast(level, d, Component.literal("\u2605 VICTORY! You held the Last Bastion for " + cleared + " waves. Three Warforged Tokens each - "
+                    + "and the horde keeps coming, if you dare to stay.").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+            celebrate(level, core, 0xFFE070);
+            celebrate(level, core, 0x7CFF9B);
+        }
+        com.lastbastion.siege.raid.Downed.reviveAll(level);
         if (d.modifier == NightModifier.STORM) level.setWeatherParameters(6000, 0, false, false);
         d.bestWave = Math.max(d.bestWave, cleared);
         d.wave = cleared + 1;
@@ -354,12 +471,32 @@ public final class SiegeManager {
         d.modifier = NightModifier.NONE;
         d.queue.clear();
         d.tracked.clear();
+        d.raidPlan.clear();
         d.calledEarly = false;
+        d.prepTicks = d.rules.i(SiegeRules.PREP_SECONDS) * 20;
+        planNext(level, d);
         d.setDirty();
         for (Entity e : level.getAllEntities()) {
             if (e instanceof HeroEntity h) h.onWaveCleared();
         }
         Fx.skyBeam(level, Vec3.atCenterOf(core), 0x7CFF9B, 30, 1.2);
+        if (d.rules.trigger() != SiegeRules.TRIGGER_NIGHT) {
+            for (ServerPlayer p : players) {
+                p.sendSystemMessage(Component.literal("Wave " + d.wave + " arrives " + arrivalText(d) + ".").withStyle(ChatFormatting.GRAY));
+            }
+        }
+    }
+
+    /** Firework bursts over the core. */
+    private static void celebrate(ServerLevel level, BlockPos core, int color) {
+        Vec3 c = Vec3.atCenterOf(core);
+        for (int i = 0; i < 6; i++) {
+            Vec3 at = c.add(level.random.nextGaussian() * 6, 10 + level.random.nextDouble() * 8, level.random.nextGaussian() * 6);
+            Vfx.spray(level, FxStyle.STAR, at, 0xFFFFFF, color, 0.35f, 30, 0.6f, 0f);
+            Vfx.flash(level, at, color, 2.5f, 8);
+        }
+        level.playSound(null, core, SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, SoundSource.AMBIENT, 3f, 1f);
+        level.playSound(null, core, SoundEvents.FIREWORK_ROCKET_TWINKLE, SoundSource.AMBIENT, 3f, 1f);
     }
 
     // ------------------------------------------------------------------ core damage / defeat
@@ -395,6 +532,7 @@ public final class SiegeManager {
         }
         if (amount > 0) {
             d.coreHp -= amount;
+            d.coreHit = true;
             level.playSound(null, d.corePos, SoundEvents.RESPAWN_ANCHOR_DEPLETE.value(), SoundSource.BLOCKS, 0.6f, 1.6f);
             level.sendParticles(ParticleTypes.DAMAGE_INDICATOR, c.x, c.y + 0.8, c.z, 3, 0.4, 0.3, 0.4, 0.1);
         }
@@ -438,7 +576,9 @@ public final class SiegeManager {
                     Component.literal("You held until wave " + reached + ". The siege restarts from wave 1.").withStyle(ChatFormatting.GRAY));
         }
         clearEnemies(level, d);
-        if (SiegeConfig.HARSH_DEFEAT.get()) {
+        com.lastbastion.siege.raid.RaidEvents.clear(level, d);
+        com.lastbastion.siege.raid.Downed.reviveAll(level);
+        if (d.rules.on(SiegeRules.HARSH_DEFEAT)) {
             List<Entity> doomed = new ArrayList<>();
             for (Entity e : level.getAllEntities()) {
                 if (e instanceof TurretEntity || e instanceof HeroEntity) doomed.add(e);
@@ -450,7 +590,7 @@ public final class SiegeManager {
             d.fallenHeroes.clear();
             Arrays.fill(d.upgrades, 0);
         }
-        double keep = SiegeConfig.SALVAGE_FRACTION.get();
+        double keep = d.rules.i(SiegeRules.SALVAGE) / 100.0;
         d.credits.replaceAll((k, v) -> Math.max(SiegeConfig.STARTING_CREDITS.get(), (int) (v * keep)));
         d.bestWave = Math.max(d.bestWave, reached - 1);
         d.wave = 1;
@@ -459,6 +599,9 @@ public final class SiegeManager {
         d.corePos = null;
         d.queue.clear();
         d.tracked.clear();
+        d.nextQueue.clear();
+        d.nextWave = 0;
+        d.victorious = false;
         d.setDirty();
         level.setBlock(core, Blocks.AIR.defaultBlockState(), 3);
         ItemEntity drop = new ItemEntity(level, c.x, c.y, c.z, new ItemStack(ModItems.SIEGE_CORE.get()));
@@ -503,7 +646,7 @@ public final class SiegeManager {
             d.kills.merge(credit, 1, Integer::sum);
         } else if (d.corePos != null) {
             // environmental kills (traps, storms) split among defenders present
-            List<ServerPlayer> ps = playersNear(level, d.corePos, SiegeConfig.PLAYER_PRESENCE_RADIUS.get());
+            List<ServerPlayer> ps = playersNear(level, d.corePos, presenceRadius());
             for (ServerPlayer p : ps) award(level, d, p.getUUID(), value / (float) ps.size(), dead.position().add(0, dead.getBbHeight(), 0), true);
         }
         d.setDirty();
@@ -511,7 +654,7 @@ public final class SiegeManager {
 
     /** Apply all credit multipliers and pay the player. Returns the amount paid. */
     public static int award(ServerLevel level, SiegeData d, UUID player, float base, @Nullable Vec3 popupAt, boolean kill) {
-        float mult = SiegeConfig.CREDIT_MULTIPLIER.get().floatValue() * (1f + 0.1f * d.level(CoreUpgrade.TREASURY));
+        float mult = d.rules.f(SiegeRules.CREDITS) * (1f + 0.1f * d.level(CoreUpgrade.TREASURY));
         if (d.state == SiegeState.WAVE) mult *= d.modifier.creditMult;
         if (kill && popupAt != null && com.lastbastion.block.SupportBlock.harvesterNear(popupAt)) mult *= 1.25f;
         if (kill) mult *= com.lastbastion.item.armor.ArmorSets.creditMult(level.getPlayerByUUID(player));
@@ -661,24 +804,120 @@ public final class SiegeManager {
     }
 
     public static void syncHud(ServerLevel level, SiegeData d) {
-        long t = level.getDayTime() % 24000L;
-        int toNight = (int) (t < 13000 ? 13000 - t : 24000 - t + 13000);
+        int toWave = switch (d.rules.trigger()) {
+            case SiegeRules.TRIGGER_TIMER -> Math.max(0, d.prepTicks);
+            case SiegeRules.TRIGGER_MANUAL -> -1;
+            default -> {
+                long t = level.getDayTime() % 24000L;
+                yield (int) (t < 13000 ? 13000 - t : 24000 - t + 13000);
+            }
+        };
         int remaining = d.tracked.size();
         for (WavePlanner.Group g : d.queue) remaining += g.units.size();
         d.waveTotal = Math.max(d.waveTotal, d.waveKilled + remaining);
+        boolean core = d.hasCore() && isCoreLevel(level, d) && d.corePos != null;
+        int[] intel = core && d.state == SiegeState.PREPARING && d.nextWave == d.wave ? intel(d) : new int[0];
+        int[] objectives = core && d.state == SiegeState.WAVE ? com.lastbastion.siege.raid.RaidEvents.objectives(level, d) : new int[0];
+        int[] cds = cooldownSeconds(d);
         for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
-            boolean here = d.hasCore() && p.level() == level && d.corePos != null
-                    && p.position().distanceToSqr(Vec3.atCenterOf(d.corePos)) < 400 * 400;
+            boolean here = core && p.level() == level && p.position().distanceToSqr(Vec3.atCenterOf(d.corePos)) < 400 * 400;
             Net.sendTo(p, new HudSyncPacket(here ? d.state.ordinal() : 0, d.wave, d.coreHp, d.maxHp(), d.shield, d.maxShield(),
-                    remaining, d.waveTotal, d.modifier.ordinal(), d.credits(p.getUUID()), toNight,
-                    here && d.corePos != null ? d.corePos : BlockPos.ZERO, d.bestWave, d.upgrades.clone(), cooldownSeconds(d), d.aegisTicks));
+                    remaining, d.waveTotal, d.modifier.ordinal(), d.credits(p.getUUID()), toWave,
+                    here ? d.corePos : BlockPos.ZERO, d.bestWave, d.upgrades.clone(), cds, d.aegisTicks,
+                    d.rules.trigger(), d.rules.i(SiegeRules.VICTORY_WAVE), here && d.state == SiegeState.WAVE && !d.coreHit,
+                    d.rules.isBossWave(d.wave), here ? intel : new int[0], here ? objectives : new int[0]));
         }
+    }
+
+    /**
+     * Forecast for the planned next wave: [night modifier, enemy count, then (kind, count) pairs, strongest
+     * first; bosses are encoded as {@link WavePlanner#BOSS_OFFSET} + boss ordinal].
+     */
+    private static int[] intel(SiegeData d) {
+        Map<Integer, Integer> counts = new LinkedHashMap<>();
+        int total = 0;
+        for (WavePlanner.Group g : d.nextQueue) {
+            for (WavePlanner.Unit u : g.units) {
+                counts.merge(u.kind(), 1, Integer::sum);
+                total++;
+            }
+        }
+        List<Map.Entry<Integer, Integer>> list = new ArrayList<>(counts.entrySet());
+        list.sort((a, b) -> {
+            boolean ab = a.getKey() >= WavePlanner.BOSS_OFFSET, bb = b.getKey() >= WavePlanner.BOSS_OFFSET;
+            if (ab != bb) return ab ? -1 : 1;
+            return Integer.compare(b.getValue(), a.getValue());
+        });
+        int[] out = new int[2 + list.size() * 2];
+        out[0] = d.nextModifier.ordinal();
+        out[1] = total;
+        for (int i = 0; i < list.size(); i++) {
+            out[2 + i * 2] = list.get(i).getKey();
+            out[3 + i * 2] = list.get(i).getValue();
+        }
+        return out;
     }
 
     private static int[] cooldownSeconds(SiegeData d) {
         int[] out = new int[d.abilityCd.length];
         for (int i = 0; i < out.length; i++) out[i] = (d.abilityCd[i] + 19) / 20;
         return out;
+    }
+
+    // ------------------------------------------------------------------ rules
+
+    /** May this player change the world's siege rules? (See {@link SiegeConfig#RULES_EDITING}.) */
+    public static boolean canEditRules(ServerPlayer p) {
+        SiegeData d = data(p.serverLevel());
+        boolean op = p.hasPermissions(2) || p.server.isSingleplayerOwner(p.getGameProfile());
+        return switch (SiegeConfig.RULES_EDITING.get()) {
+            case LOCKED -> false;
+            case OP_ONLY -> op;
+            case ANYONE -> true;
+            default -> op || (d.coreOwner != null && d.coreOwner.equals(p.getUUID()));
+        };
+    }
+
+    public static void openRules(ServerPlayer p) {
+        SiegeData d = data(p.serverLevel());
+        Net.sendTo(p, new com.lastbastion.network.RulesPacket(d.rules.save(), canEditRules(p), true));
+    }
+
+    /** Apply rules edited in the rules screen, announcing what changed. */
+    public static void applyRules(ServerPlayer p, net.minecraft.nbt.CompoundTag tag, boolean reset) {
+        ServerLevel level = p.serverLevel();
+        SiegeData d = data(level);
+        if (!canEditRules(p)) {
+            p.displayClientMessage(Component.literal("Only the core's owner or an operator can change the siege rules.").withStyle(ChatFormatting.RED), true);
+            return;
+        }
+        SiegeRules before = d.rules.copy();
+        if (reset) {
+            d.rules.reset();
+        } else {
+            for (SiegeRules.Rule r : SiegeRules.ALL) if (tag.contains(r.key)) d.rules.set(r, tag.getDouble(r.key));
+        }
+        List<String> changes = new ArrayList<>();
+        for (SiegeRules.Rule r : SiegeRules.ALL) {
+            if (Math.abs(before.get(r) - d.rules.get(r)) > 1e-9) changes.add(r.label + " " + r.format(d.rules.get(r)));
+        }
+        d.coreHp = Math.min(d.coreHp, d.maxHp());
+        d.shield = Math.min(d.shield, d.maxShield());
+        if (d.state == SiegeState.PREPARING) {
+            d.nextWave = 0;
+            if (d.rules.trigger() == SiegeRules.TRIGGER_TIMER && (before.trigger() != SiegeRules.TRIGGER_TIMER || d.prepTicks > d.rules.i(SiegeRules.PREP_SECONDS) * 20)) {
+                d.prepTicks = d.rules.i(SiegeRules.PREP_SECONDS) * 20;
+            }
+        }
+        d.setDirty();
+        Net.sendTo(p, new com.lastbastion.network.RulesPacket(d.rules.save(), true, false));
+        if (changes.isEmpty()) return;
+        String summary = changes.size() > 6 ? String.join(", ", changes.subList(0, 6)) + " and " + (changes.size() - 6) + " more" : String.join(", ", changes);
+        Component msg = Component.literal("\u2699 " + p.getGameProfile().getName() + (reset ? " reset the siege rules: " : " changed the siege rules: "))
+                .withStyle(ChatFormatting.GOLD).append(Component.literal(summary).withStyle(ChatFormatting.GRAY));
+        if (d.corePos != null && isCoreLevel(level, d)) broadcast(level, d, msg);
+        else p.sendSystemMessage(msg);
+        syncHud(level, d);
     }
 
     public static void broadcast(ServerLevel level, SiegeData d, Component msg) {

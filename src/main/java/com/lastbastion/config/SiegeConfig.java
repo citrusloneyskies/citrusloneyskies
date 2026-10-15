@@ -19,6 +19,16 @@ public final class SiegeConfig {
     public static final ForgeConfigSpec.IntValue MAX_ALIVE;
     public static final ForgeConfigSpec.BooleanValue NIGHT_MODIFIERS;
     public static final ForgeConfigSpec.IntValue PLAYER_PRESENCE_RADIUS;
+    public static final ForgeConfigSpec.BooleanValue WAR_EVENTS;
+    public static final ForgeConfigSpec.BooleanValue DOWNED;
+    public static final ForgeConfigSpec.IntValue BLEED_OUT_SECONDS;
+    public static final ForgeConfigSpec.EnumValue<RuleEditing> RULES_EDITING;
+    public static final ForgeConfigSpec.BooleanValue SUMMON_ANYWHERE;
+    public static final ForgeConfigSpec.IntValue MAX_HEROES;
+    public static final ForgeConfigSpec.BooleanValue DEVIL_BLOOD_PRICE;
+
+    /** Who may change a world's siege rules in game. */
+    public enum RuleEditing {OWNER_OR_OP, OP_ONLY, ANYONE, LOCKED}
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -43,6 +53,24 @@ public final class SiegeConfig {
         NIGHT_MODIFIERS = b.comment("Enable special nights (Blood Moon, Fog, Storm, Horde...) from wave 6 onwards.").define("nightModifiers", true);
         PLAYER_PRESENCE_RADIUS = b.comment("The siege only progresses while a player is within this distance of the core.")
                 .defineInRange("playerPresenceRadius", 160, 16, 1024);
+        WAR_EVENTS = b.comment("Default for new sieges: mid-wave war events (supply drops, corruption rifts, warlords).").define("warEvents", true);
+        RULES_EDITING = b.comment("Who may change a world's siege rules from the war room or /siege rules.",
+                "Every value above is only the default for new sieges; the rules screen overrides them per world.")
+                .defineEnum("rulesEditing", RuleEditing.OWNER_OR_OP);
+        b.pop();
+
+        b.push("coop");
+        DOWNED = b.comment("Default for new sieges: with a teammate nearby, a fatal blow during a wave downs a player instead of killing them.")
+                .define("downedState", true);
+        BLEED_OUT_SECONDS = b.comment("Default for new sieges: how long a downed player can wait for a revive.").defineInRange("bleedOutSeconds", 30, 5, 300);
+        b.pop();
+
+        b.push("summons");
+        SUMMON_ANYWHERE = b.comment("Heroes and devils can be summoned anywhere. Without a Siege Core they follow, guard or hunt for their summoner.")
+                .define("summonAnywhere", true);
+        MAX_HEROES = b.comment("Maximum heroes one player can have in the world at once (devils are always limited to one per player).")
+                .defineInRange("maxHeroesPerPlayer", 6, 1, 64);
+        DEVIL_BLOOD_PRICE = b.comment("Summoning a devil costs half of the summoner's current health (the blood pact).").define("devilBloodPrice", true);
         b.pop();
         SPEC = b.build();
     }

@@ -200,7 +200,7 @@ public class AssaultCoreGoal extends Goal {
         float hardness = s.getDestroySpeed(level, p);
         if (hardness < 0) return false;
         if (s.getBlock() instanceof BarricadeBlock) return true;
-        if (!SiegeConfig.ZOMBIES_BREAK_BLOCKS.get()) return false;
+        if (!com.lastbastion.siege.SiegeManager.data(level).rules.on(com.lastbastion.siege.SiegeRules.BREAK_BLOCKS)) return false;
         return hardness <= SiegeConfig.MAX_BREAKABLE_HARDNESS.get() || mob.canBreachHard();
     }
 

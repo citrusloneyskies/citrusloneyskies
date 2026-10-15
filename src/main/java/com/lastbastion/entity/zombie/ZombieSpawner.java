@@ -15,8 +15,8 @@ public final class ZombieSpawner {
     @Nullable
     public static SiegeZombie spawn(ServerLevel level, ZombieKind kind, ZombieRank rank, int affixes, Vec3 pos,
                                     boolean waveMob, boolean rise) {
-        int wave = SiegeManager.wave(level);
-        return spawn(level, kind, rank, affixes, pos, waveMob, rise, WavePlanner.hpScale(wave), WavePlanner.damageScale(wave));
+        com.lastbastion.siege.SiegeData d = SiegeManager.data(level);
+        return spawn(level, kind, rank, affixes, pos, waveMob, rise, WavePlanner.hpScale(d.rules, d.wave), WavePlanner.damageScale(d.rules, d.wave));
     }
 
     @Nullable

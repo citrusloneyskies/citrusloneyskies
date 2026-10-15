@@ -62,9 +62,10 @@ public final class ShopCatalog {
          * the weapon in hand). -1 = sold out / maxed, -2 = not applicable right now.
          */
         public int cost(int[] upgrades, int wave, ItemStack held) {
-            if (id.equals(UPGRADE_WEAPON)) {
+            if (id.equals(UPGRADE_WEAPON) || id.equals(UPGRADE_WEAPON_TOKEN)) {
                 if (held == null || !(held.getItem() instanceof Arsenal.Upgradeable)) return -2;
-                return Arsenal.upgradeCost(held);
+                int c = Arsenal.upgradeCost(held);
+                return c < 0 ? -1 : id.equals(UPGRADE_WEAPON_TOKEN) ? 0 : c;
             }
             if (upgrade != null) {
                 int lvl = upgrades[upgrade.ordinal()];
@@ -76,6 +77,13 @@ public final class ShopCatalog {
     }
 
     public static final String UPGRADE_WEAPON = "upgrade_weapon";
+    /** Same upgrade, paid with a Warforged Token instead of credits. */
+    public static final String UPGRADE_WEAPON_TOKEN = "upgrade_weapon_token";
+
+    /** True for entries paid in Warforged Tokens (the screen shows "1 Token" instead of credits). */
+    public static boolean paidInTokens(Entry e) {
+        return e.id.equals(UPGRADE_WEAPON_TOKEN);
+    }
     private static List<Entry> entries;
     private static Map<String, Entry> byId;
 
@@ -111,6 +119,9 @@ public final class ShopCatalog {
                 "Raises the arsenal weapon in your main hand by one Mk (up to Mk V).",
                 "Each Mk: more damage. Mk III awakens a second passive; Mk V ascends the special ability.",
                 "Cost: 40% / 70% / 110% / 160% of the weapon's price for Mk II / III / IV / V."));
+        l.add(new Entry(UPGRADE_WEAPON_TOKEN, Category.ARSENAL, "Upgrade with Warforged Token", 0, stack(ModItems.WARFORGED_TOKEN, 1), null, null,
+                "Spend one Warforged Token to raise the arsenal weapon in your main hand by one Mk - no credits needed.",
+                "Tokens drop from Warlords and bosses, are awarded every 10 waves and turn up in rare supply drops."));
         for (WeaponKind k : WeaponKind.values()) {
             l.add(new Entry("melee_" + k.id, Category.ARSENAL, k.title, k.cost, stack(ModItems.MELEE.get(k), 1), stack(ModItems.MELEE.get(k), 1), null,
                     String.format("%.0f damage, %.1f attacks/s, reach %.1f, cleaves %d.", k.damage, k.attacksPerSecond, k.reach, k.cleave),
@@ -207,6 +218,12 @@ public final class ShopCatalog {
         int cost = e.cost(d.upgrades, d.wave, held);
         if (cost == -2) return Component.literal("Hold an arsenal weapon in your main hand to upgrade it.").withStyle(ChatFormatting.YELLOW);
         if (cost < 0) return Component.literal("Already at maximum level.").withStyle(ChatFormatting.YELLOW);
+        if (paidInTokens(e)) {
+            int slot = tokenSlot(player);
+            if (slot < 0 && !player.isCreative()) return Component.literal("You need a Warforged Token.").withStyle(ChatFormatting.RED);
+            if (slot >= 0 && !player.isCreative()) player.getInventory().getItem(slot).shrink(1);
+            return upgradeHeld(level, player, held);
+        }
         if (!SiegeManager.spend(level, player, cost)) {
             return Component.literal("Not enough credits (" + cost + " needed).").withStyle(ChatFormatting.RED);
         }
@@ -219,17 +236,7 @@ public final class ShopCatalog {
             com.lastbastion.combat.Fx.skyBeam(level, net.minecraft.world.phys.Vec3.atCenterOf(SiegeManager.corePos(level)), 0xC86BFF, 30, 1.2);
             return Component.literal(e.upgrade.title + " upgraded to level " + d.upgrades[e.upgrade.ordinal()] + "!").withStyle(ChatFormatting.LIGHT_PURPLE);
         }
-        if (id.equals(UPGRADE_WEAPON)) {
-            int mk = Arsenal.mk(held) + 1;
-            Arsenal.setMk(held, mk);
-            String title = held.getItem() instanceof Arsenal.Upgradeable u ? u.displayTitle() : "Weapon";
-            level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.ANVIL_USE, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.2f);
-            level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.4f);
-            com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.STAR, player.position().add(0, 1.2, 0), 0xFFFFFF, 0xFFD966, 0.25f, 20, 0.25f, 0.8f);
-            com.lastbastion.fx.Vfx.ring(level, player.position().add(0, 0.1, 0), 0xFFD966, 2.5f, 14, 0.8f);
-            String extra = mk == 3 ? " Awakened!" : mk == Arsenal.MAX_MK ? " Ascended!" : "";
-            return Component.literal(title + " upgraded to Mk " + Arsenal.roman(mk) + "." + extra).withStyle(Arsenal.mkColor(mk));
-        }
+        if (id.equals(UPGRADE_WEAPON)) return upgradeHeld(level, player, held);
         if (id.equals("core_repair_now")) {
             SiegeManager.healCore(level, d.maxHp() * 0.25f);
             SiegeManager.syncHud(level, d);
@@ -244,6 +251,26 @@ public final class ShopCatalog {
         }
         player.playNotifySound(net.minecraft.sounds.SoundEvents.VILLAGER_YES, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.2f);
         return Component.literal("Purchased " + e.name + " for " + cost + " credits.").withStyle(ChatFormatting.GREEN);
+    }
+
+    private static Component upgradeHeld(ServerLevel level, ServerPlayer player, ItemStack held) {
+        int mk = Arsenal.mk(held) + 1;
+        Arsenal.setMk(held, mk);
+        String title = held.getItem() instanceof Arsenal.Upgradeable u ? u.displayTitle() : "Weapon";
+        level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.ANVIL_USE, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.2f);
+        level.playSound(null, player.blockPosition(), net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, net.minecraft.sounds.SoundSource.PLAYERS, 0.8f, 1.4f);
+        com.lastbastion.fx.Vfx.spray(level, com.lastbastion.fx.FxStyle.STAR, player.position().add(0, 1.2, 0), 0xFFFFFF, 0xFFD966, 0.25f, 20, 0.25f, 0.8f);
+        com.lastbastion.fx.Vfx.ring(level, player.position().add(0, 0.1, 0), 0xFFD966, 2.5f, 14, 0.8f);
+        String extra = mk == 3 ? " Awakened!" : mk == Arsenal.MAX_MK ? " Ascended!" : "";
+        return Component.literal(title + " upgraded to Mk " + Arsenal.roman(mk) + "." + extra).withStyle(Arsenal.mkColor(mk));
+    }
+
+    /** Inventory slot holding a Warforged Token, or -1. */
+    public static int tokenSlot(net.minecraft.world.entity.player.Player p) {
+        for (int i = 0; i < p.getInventory().getContainerSize(); i++) {
+            if (p.getInventory().getItem(i).is(ModItems.WARFORGED_TOKEN.get())) return i;
+        }
+        return -1;
     }
 
     public static int reviveCost(SiegeData.FallenHero f) {

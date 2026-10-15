@@ -82,18 +82,22 @@ public class CoreScreen extends Screen {
 
     private void buildCommandTab() {
         int x = left + 92, y = top + 34;
-        Button horn = Button.builder(Component.literal("Sound the War Horn (start next wave, +25% bonus)"), b -> {
+        Button horn = Button.builder(Component.literal("Sound the War Horn (start the wave now, +25% bonus)"), b -> {
             Net.toServer(new ActionPacket(ActionPacket.CALL_WAVE, 0, ""));
             onClose();
         }).bounds(x, y, w - 100, 20).build();
         horn.active = ClientSiegeState.state() == SiegeState.PREPARING;
         dynamic.add(addRenderableWidget(horn));
         y += 22;
-        dynamic.add(addRenderableWidget(Button.builder(Component.literal("Core Protocols (abilities) - also on key V"),
-                b -> Minecraft.getInstance().setScreen(new ProtocolScreen())).bounds(x, y, w - 100, 20).build()));
-        y += 26;
-        int bw = (w - 100 - 8) / 3;
-        for (int i = 0; i < HeroMode.values().length; i++) {
+        int half = (w - 100 - 4) / 2;
+        dynamic.add(addRenderableWidget(Button.builder(Component.literal("Core Protocols (V)"),
+                b -> Minecraft.getInstance().setScreen(new ProtocolScreen())).bounds(x, y, half, 20).build()));
+        dynamic.add(addRenderableWidget(Button.builder(Component.literal("\u2699 Siege Rules"),
+                b -> Net.toServer(new ActionPacket(ActionPacket.OPEN_RULES, 0, ""))).bounds(x + half + 4, y, half, 20).build()));
+        y += 24;
+        int modes = HeroMode.values().length;
+        int bw = (w - 100 - 4 * (modes - 1)) / modes;
+        for (int i = 0; i < modes; i++) {
             HeroMode m = HeroMode.values()[i];
             dynamic.add(addRenderableWidget(Button.builder(Component.literal("All: " + m.title),
                     b -> Net.toServer(new ActionPacket(ActionPacket.ALL_HEROES_MODE, 0, m.name()))).bounds(x + i * (bw + 4), y, bw, 20).build()));
@@ -167,8 +171,13 @@ public class CoreScreen extends Screen {
                 int cost = e.cost(up, ClientSiegeState.wave(), held());
                 String name = font.plainSubstrByWidth(e.name, lw - 26);
                 g.drawString(font, name, lx + 22, y + 2, 0xFFFFFF, false);
-                String c = cost == -2 ? "\u2014" : cost < 0 ? "MAX" : String.format("%,d", cost);
-                g.drawString(font, c, lx + 22, y + 12, cost < 0 ? 0x7CFF9B : ClientSiegeState.credits() >= cost ? 0xFFD966 : 0xFF6060, false);
+                if (ShopCatalog.paidInTokens(e)) {
+                    String c = cost == -2 ? "\u2014" : cost < 0 ? "MAX" : "1 Warforged Token";
+                    g.drawString(font, c, lx + 22, y + 12, cost < 0 ? 0x7CFF9B : hasToken() ? 0xC070FF : 0xFF6060, false);
+                } else {
+                    String c = cost == -2 ? "\u2014" : cost < 0 ? "MAX" : String.format("%,d", cost);
+                    g.drawString(font, c, lx + 22, y + 12, cost < 0 ? 0x7CFF9B : ClientSiegeState.credits() >= cost ? 0xFFD966 : 0xFF6060, false);
+                }
                 if (e.upgrade != null) {
                     String lvl = "Lv " + up[e.upgrade.ordinal()] + "/" + e.upgrade.maxLevel;
                     g.drawString(font, lvl, lx + lw - 4 - font.width(lvl), y + 12, 0xC86BFF, false);
@@ -193,26 +202,71 @@ public class CoreScreen extends Screen {
             cy += 3;
         }
         int cost = selected.cost(up, ClientSiegeState.wave(), held());
-        buyButton.active = cost >= 0 && ClientSiegeState.credits() >= cost;
-        buyButton.setMessage(Component.literal(cost == -2 ? "Hold a weapon" : cost < 0 ? "Maxed" : "Buy (" + String.format("%,d", cost) + ")"));
+        if (ShopCatalog.paidInTokens(selected)) {
+            buyButton.active = cost >= 0 && hasToken();
+            buyButton.setMessage(Component.literal(cost == -2 ? "Hold a weapon" : cost < 0 ? "Maxed" : hasToken() ? "Spend 1 Token" : "No Token"));
+        } else {
+            buyButton.active = cost >= 0 && ClientSiegeState.credits() >= cost;
+            buyButton.setMessage(Component.literal(cost == -2 ? "Hold a weapon" : cost < 0 ? "Maxed" : "Buy (" + String.format("%,d", cost) + ")"));
+        }
     }
 
     private void renderCommand(GuiGraphics g) {
         int x = left + 92, y = top + 104;
-        g.drawString(font, "Your heroes on the field:", x, y, 0x7CFF9B, false);
-        y += 12;
+        int colW = (w - 100 - 6) / 2;
+        int ix = x + colW + 6;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
+        // left column: your heroes
+        g.drawString(font, "Your heroes on the field:", x, y, 0x7CFF9B, false);
+        int hy = y + 12;
         List<HeroEntity> heroes = mc.level.getEntitiesOfClass(HeroEntity.class, new AABB(core).inflate(96),
                 hh -> mc.player.getUUID().equals(hh.getOwnerId()));
-        if (heroes.isEmpty()) g.drawString(font, "  none - buy hero sigils in the Heroes tab", x, y, 0x808080, false);
+        if (heroes.isEmpty()) g.drawString(font, font.plainSubstrByWidth("none yet (Heroes tab)", colW), x + 4, hy, 0x808080, false);
         int count = 0;
-        int maxRows = Math.max(1, (top + h - 24 - Math.min(fallen.length / 2, 3) * 20 - y) / 10);
+        int maxRows = Math.max(1, (top + h - 24 - Math.min(fallen.length / 2, 3) * 20 - hy) / 10);
         for (HeroEntity he : heroes) {
             if (count++ >= maxRows) break;
-            String s = "  " + he.kind.title + "  Lv" + he.heroLevel() + "  " + (int) he.getHealth() + "/" + (int) he.getMaxHealth() + "  [" + he.mode().title + "]";
-            g.drawString(font, font.plainSubstrByWidth(s, w - 100), x, y, 0xD0D0D0, false);
-            y += 10;
+            String st = he.kind.title.split(",")[0] + " Lv" + he.heroLevel() + " " + Math.round(100 * he.getHealth() / he.getMaxHealth()) + "%";
+            g.drawString(font, font.plainSubstrByWidth(st, colW - 4), x + 4, hy, 0xD0D0D0, false);
+            hy += 10;
+        }
+        // right column: next-wave intel
+        g.fill(ix - 2, y - 2, ix + colW, y + 92, 0xFF12161B);
+        var hud = ClientSiegeState.hud;
+        int[] intel = hud == null ? new int[0] : hud.intel();
+        if (ClientSiegeState.state() == SiegeState.WAVE) {
+            g.drawString(font, "Wave " + ClientSiegeState.wave() + " in progress", ix + 2, y + 2, 0xFF7070, false);
+            g.drawString(font, (hud == null ? 0 : hud.remaining()) + " undead remain", ix + 2, y + 14, 0xC0C0C0, false);
+        } else if (intel.length >= 2) {
+            g.drawString(font, "INTEL: wave " + ClientSiegeState.wave(), ix + 2, y + 2, 0x8FD8FF, false);
+            int iy = y + 14;
+            com.lastbastion.siege.NightModifier m = com.lastbastion.siege.NightModifier.byId(intel[0]);
+            if (m != com.lastbastion.siege.NightModifier.NONE) {
+                g.drawString(font, font.plainSubstrByWidth("\u263D " + m.title, colW - 4), ix + 2, iy, m.color, false);
+                iy += 10;
+            }
+            g.drawString(font, intel[1] + " undead", ix + 2, iy, 0xC0C0C0, false);
+            iy += 10;
+            for (int i = 2; i + 1 < intel.length && iy < y + 84; i += 2) {
+                int kind = intel[i];
+                String name;
+                int col;
+                if (kind >= com.lastbastion.siege.WavePlanner.BOSS_OFFSET) {
+                    int b = kind - com.lastbastion.siege.WavePlanner.BOSS_OFFSET;
+                    name = "BOSS " + (b < com.lastbastion.entity.boss.BossKind.values().length ? com.lastbastion.entity.boss.BossKind.values()[b].title : "?");
+                    col = 0xFF5050;
+                } else {
+                    var zk = com.lastbastion.entity.zombie.ZombieKind.values()[Math.max(0, Math.min(kind, com.lastbastion.entity.zombie.ZombieKind.values().length - 1))];
+                    name = intel[i + 1] + "\u00D7 " + Component.translatable("entity.lastbastion." + zk.id).getString();
+                    col = 0xA8B0B8;
+                }
+                g.drawString(font, font.plainSubstrByWidth(name, colW - 6), ix + 4, iy, col, false);
+                iy += 10;
+            }
+        } else {
+            g.drawString(font, "Intel arrives once the", ix + 2, y + 2, 0x808080, false);
+            g.drawString(font, "next wave is planned.", ix + 2, y + 12, 0x808080, false);
         }
         int ry = top + h - 6 - Math.min(fallen.length / 2, 3) * 20;
         if (fallen.length > 0) g.drawString(font, "Fallen heroes (revive for half price):", x, ry - 11, 0xFF8080, false);
@@ -254,6 +308,11 @@ public class CoreScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private static boolean hasToken() {
+        var p = Minecraft.getInstance().player;
+        return p != null && (p.isCreative() || ShopCatalog.tokenSlot(p) >= 0);
     }
 
     private static ItemStack held() {

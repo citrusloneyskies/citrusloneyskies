@@ -46,6 +46,23 @@ public class SiegeData extends SavedData {
     public int lastHitTick;
     public boolean calledEarly;
     public boolean bossAlive;
+    /** This world's siege rules (defaults come from the server config). */
+    public final SiegeRules rules = new SiegeRules();
+    /** The next wave, planned as soon as the last one ends so the war room can show intel on it. */
+    public final List<WavePlanner.Group> nextQueue = new ArrayList<>();
+    public NightModifier nextModifier = NightModifier.NONE;
+    /** Wave number and party size {@link #nextQueue} was planned for (0 = not planned yet). */
+    public int nextWave, nextPlayers;
+    /** True once the core's hull has taken damage this wave (no perfect-defence bonus). */
+    public boolean coreHit;
+    /** War events still to come this wave: {kind ordinal, wave tick}. */
+    public final List<int[]> raidPlan = new ArrayList<>();
+    /** Live war-event entities: rifts, warlords, supply crates. */
+    public final Set<UUID> raidEntities = new HashSet<>();
+    /** Ticks of preparation left before the next wave (Timer trigger). */
+    public int prepTicks;
+    /** The victory wave has been cleared (the siege continues as endless). */
+    public boolean victorious;
 
     public record FallenHero(UUID owner, int heroKind, int level, int xp) {
     }
@@ -63,7 +80,7 @@ public class SiegeData extends SavedData {
     }
 
     public float maxHp() {
-        return SiegeConfig.BASE_CORE_HEALTH.get() * (1f + 0.3f * level(CoreUpgrade.FORTIFY));
+        return SiegeConfig.BASE_CORE_HEALTH.get() * rules.f(SiegeRules.CORE_HEALTH) * (1f + 0.3f * level(CoreUpgrade.FORTIFY));
     }
 
     public float maxShield() {
@@ -124,6 +141,17 @@ public class SiegeData extends SavedData {
         int[] cds = tag.getIntArray("abilityCd");
         System.arraycopy(cds, 0, d.abilityCd, 0, Math.min(cds.length, d.abilityCd.length));
         d.calledEarly = tag.getBoolean("early");
+        if (tag.contains("rules")) d.rules.load(tag.getCompound("rules"));
+        for (Tag t : tag.getList("nextQueue", Tag.TAG_COMPOUND)) d.nextQueue.add(WavePlanner.Group.load((CompoundTag) t));
+        d.nextModifier = NightModifier.byId(tag.getInt("nextMod"));
+        d.nextWave = tag.getInt("nextWave");
+        d.nextPlayers = tag.getInt("nextPlayers");
+        d.coreHit = tag.getBoolean("coreHit");
+        int[] plan = tag.getIntArray("raidPlan");
+        for (int i = 0; i + 1 < plan.length; i += 2) d.raidPlan.add(new int[]{plan[i], plan[i + 1]});
+        for (Tag t : tag.getList("raidEntities", Tag.TAG_INT_ARRAY)) d.raidEntities.add(NbtUtils.loadUUID(t));
+        d.prepTicks = tag.getInt("prepTicks");
+        d.victorious = tag.getBoolean("victorious");
         return d;
     }
 
@@ -173,6 +201,25 @@ public class SiegeData extends SavedData {
         tag.putInt("pulseCd", pulseCooldown);
         tag.putIntArray("abilityCd", abilityCd);
         tag.putBoolean("early", calledEarly);
+        tag.put("rules", rules.save());
+        ListTag nq = new ListTag();
+        for (WavePlanner.Group g : nextQueue) nq.add(g.save());
+        tag.put("nextQueue", nq);
+        tag.putInt("nextMod", nextModifier.ordinal());
+        tag.putInt("nextWave", nextWave);
+        tag.putInt("nextPlayers", nextPlayers);
+        tag.putBoolean("coreHit", coreHit);
+        int[] plan = new int[raidPlan.size() * 2];
+        for (int i = 0; i < raidPlan.size(); i++) {
+            plan[i * 2] = raidPlan.get(i)[0];
+            plan[i * 2 + 1] = raidPlan.get(i)[1];
+        }
+        tag.putIntArray("raidPlan", plan);
+        ListTag rl = new ListTag();
+        for (UUID u : raidEntities) rl.add(NbtUtils.createUUID(u));
+        tag.put("raidEntities", rl);
+        tag.putInt("prepTicks", prepTicks);
+        tag.putBoolean("victorious", victorious);
         return tag;
     }
 }

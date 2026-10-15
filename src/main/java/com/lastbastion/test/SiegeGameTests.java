@@ -407,4 +407,134 @@ public final class SiegeGameTests {
         if (fails.length() == 0) h.succeed();
         else h.fail(fails.toString());
     }
+
+    /** Every war event spawns, shows up as an objective, and pays out: crate claims, warlord tokens, rifts close. */
+    @GameTest(template = "arena", timeoutTicks = 120, batch = "siege_raid")
+    public static void warEvents(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        SiegeData d = SiegeManager.data(level);
+        d.wave = 9;
+        SiegeManager.startWave(level, d, false);
+        d.raidPlan.clear();
+        StringBuilder fails = new StringBuilder();
+        for (com.lastbastion.siege.raid.RaidEvents.Kind k : com.lastbastion.siege.raid.RaidEvents.Kind.values()) {
+            if (!com.lastbastion.siege.raid.RaidEvents.fire(level, d, core, k)) fails.append(k).append(" did not fire; ");
+        }
+        com.lastbastion.entity.misc.SupplyCrateEntity crate = null;
+        com.lastbastion.entity.zombie.RiftEntity rift = null;
+        SiegeZombie lord = null;
+        for (java.util.UUID id : d.raidEntities) {
+            net.minecraft.world.entity.Entity e = level.getEntity(id);
+            if (e instanceof com.lastbastion.entity.misc.SupplyCrateEntity c) crate = c;
+            if (e instanceof com.lastbastion.entity.zombie.RiftEntity r) rift = r;
+            if (e instanceof SiegeZombie z && z.isWarlord()) lord = z;
+        }
+        if (crate == null || rift == null || lord == null) fails.append("missing event entity crate=").append(crate != null)
+                .append(" rift=").append(rift != null).append(" warlord=").append(lord != null).append("; ");
+        int[] obj = com.lastbastion.siege.raid.RaidEvents.objectives(level, d);
+        if (obj.length < 3 * com.lastbastion.siege.raid.RaidEvents.OBJ_STRIDE) fails.append("objectives missing (").append(obj.length).append("); ");
+        if (rift != null && !d.tracked.contains(rift.getUUID())) fails.append("rift not tracked; ");
+        net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "raid_tester"));
+        p.moveTo(core.getX() + 2.5, core.getY(), core.getZ() + 0.5);
+        int before = d.credits(p.getUUID());
+        if (crate != null) {
+            crate.moveTo(core.getX() + 4.5, core.getY(), core.getZ() + 0.5);
+            crate.claim(p);
+            if (d.credits(p.getUUID()) <= before) fails.append("crate paid nothing; ");
+            if (crate.isAlive()) fails.append("crate not consumed; ");
+        }
+        if (lord != null) {
+            lord.hurt(level.damageSources().playerAttack(p), Float.MAX_VALUE);
+            boolean token = !level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, lord.getBoundingBox().inflate(4),
+                    it -> it.getItem().is(com.lastbastion.registry.ModItems.WARFORGED_TOKEN.get())).isEmpty();
+            if (!token) fails.append("warlord dropped no token; ");
+        }
+        if (rift != null) {
+            rift.hurt(level.damageSources().playerAttack(p), Float.MAX_VALUE);
+            if (rift.isAlive()) fails.append("rift survived; ");
+        }
+        h.runAfterDelay(40, () -> {
+            com.lastbastion.siege.raid.RaidEvents.clear(level, d);
+            teardown(h, core);
+            if (fails.length() == 0) h.succeed();
+            else h.fail(fails.toString());
+        });
+    }
+
+    /** Rules: presets fill multipliers, tweaks switch to Custom, values survive a save, and the planner obeys the roster. */
+    @GameTest(template = "arena", timeoutTicks = 40, batch = "siege_rules")
+    public static void siegeRules(GameTestHelper h) {
+        com.lastbastion.siege.SiegeRules r = new com.lastbastion.siege.SiegeRules();
+        StringBuilder fails = new StringBuilder();
+        r.set(com.lastbastion.siege.SiegeRules.PRESET, com.lastbastion.siege.SiegeRules.NIGHTMARE);
+        if (r.get(com.lastbastion.siege.SiegeRules.ENEMY_HEALTH) < 1.5) fails.append("nightmare preset not applied; ");
+        r.set(com.lastbastion.siege.SiegeRules.ENEMY_HEALTH, 2.2);
+        if (r.i(com.lastbastion.siege.SiegeRules.PRESET) != com.lastbastion.siege.SiegeRules.CUSTOM) fails.append("tweak kept preset; ");
+        r.set(com.lastbastion.siege.SiegeRules.MAX_ALIVE, 99999);
+        if (r.i(com.lastbastion.siege.SiegeRules.MAX_ALIVE) != 400) fails.append("max alive not clamped; ");
+        com.lastbastion.siege.SiegeRules copy = com.lastbastion.siege.SiegeRules.fromTag(r.save());
+        if (Math.abs(copy.get(com.lastbastion.siege.SiegeRules.ENEMY_HEALTH) - 2.2) > 1e-6) fails.append("save/load lost a value; ");
+        for (ZombieKind k : ZombieKind.values()) r.set(com.lastbastion.siege.SiegeRules.ZOMBIES.get(k), k == ZombieKind.RUNNER ? 1 : 0);
+        var plan = com.lastbastion.siege.WavePlanner.plan(r, 1, 1, com.lastbastion.siege.NightModifier.NONE, h.getLevel().random);
+        for (var g : plan) for (var u : g.units) if (!u.isBoss() && u.kind() != ZombieKind.RUNNER.ordinal()) fails.append("disabled zombie planned; ");
+        if (com.lastbastion.siege.WavePlanner.count(plan) == 0) fails.append("empty roster plan; ");
+        r.set(com.lastbastion.siege.SiegeRules.BOSS_EVERY, 3);
+        for (BossKind b : BossKind.values()) r.set(com.lastbastion.siege.SiegeRules.BOSSES.get(b), b == BossKind.MALGRAVE ? 1 : 0);
+        if (!r.isBossWave(6) || r.isBossWave(5)) fails.append("boss interval ignored; ");
+        var bosses = com.lastbastion.siege.WavePlanner.bossesFor(r, 9);
+        if (bosses.size() != 1 || bosses.get(0) != BossKind.MALGRAVE) fails.append("boss roster ignored ").append(bosses).append("; ");
+        r.set(com.lastbastion.siege.SiegeRules.BOSS_EVERY, 0);
+        if (r.isBossWave(10)) fails.append("bosses not disabled; ");
+        if (fails.length() == 0) h.succeed();
+        else h.fail(fails.toString());
+    }
+
+    /** The war room forecast matches the wave that actually starts. */
+    @GameTest(template = "arena", timeoutTicks = 40, batch = "siege_intel")
+    public static void waveIntel(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        SiegeData d = SiegeManager.data(level);
+        StringBuilder fails = new StringBuilder();
+        if (d.nextWave != d.wave || d.nextQueue.isEmpty()) fails.append("no forecast after placing the core; ");
+        int forecast = com.lastbastion.siege.WavePlanner.count(d.nextQueue);
+        SiegeManager.syncHud(level, d);
+        SiegeManager.startWave(level, d, false);
+        if (d.waveTotal != forecast) fails.append("wave differs from forecast ").append(d.waveTotal).append(" vs ").append(forecast).append("; ");
+        teardown(h, core);
+        if (fails.length() == 0) h.succeed();
+        else h.fail(fails.toString());
+    }
+
+    /** Downed players crawl, ignore damage, can be revived, and stand up when the wave ends. */
+    @GameTest(template = "arena", timeoutTicks = 40, batch = "siege_downed")
+    public static void downedRevive(GameTestHelper h) {
+        BlockPos core = setup(h);
+        ServerLevel level = h.getLevel();
+        SiegeData d = SiegeManager.data(level);
+        SiegeManager.startWave(level, d, false);
+        net.minecraft.server.level.ServerPlayer p = net.minecraftforge.common.util.FakePlayerFactory.get(level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "downed_tester"));
+        p.moveTo(core.getX() + 3.5, core.getY(), core.getZ() + 0.5);
+        StringBuilder fails = new StringBuilder();
+        com.lastbastion.siege.raid.Downed.down(p);
+        if (!com.lastbastion.siege.raid.Downed.isDowned(p)) fails.append("not downed; ");
+        if (p.getForcedPose() != net.minecraft.world.entity.Pose.SWIMMING) fails.append("not crawling; ");
+        float hp = p.getHealth();
+        p.hurt(level.damageSources().generic(), 50f);
+        if (p.getHealth() < hp || !p.isAlive()) fails.append("downed player took damage; ");
+        com.lastbastion.siege.raid.Downed.revive(p, null);
+        if (com.lastbastion.siege.raid.Downed.isDowned(p)) fails.append("revive failed; ");
+        if (p.getForcedPose() != null) fails.append("pose not restored; ");
+        if (p.getHealth() < p.getMaxHealth() * 0.3f) fails.append("revived too weak; ");
+        com.lastbastion.siege.raid.Downed.down(p);
+        com.lastbastion.siege.raid.Downed.reviveAll(level);
+        com.lastbastion.siege.raid.Downed.revive(p, null);
+        if (com.lastbastion.siege.raid.Downed.isDowned(p)) fails.append("still downed after wave end; ");
+        teardown(h, core);
+        if (fails.length() == 0) h.succeed();
+        else h.fail(fails.toString());
+    }
 }

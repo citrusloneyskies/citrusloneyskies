@@ -1,6 +1,5 @@
 package com.lastbastion.siege;
 
-import com.lastbastion.config.SiegeConfig;
 import com.lastbastion.entity.boss.BossKind;
 import com.lastbastion.entity.zombie.Affix;
 import com.lastbastion.entity.zombie.ZombieKind;
@@ -20,8 +19,10 @@ import java.util.List;
  * Builds the composition and spawn schedule for a wave.
  *
  * <h3>Difficulty model</h3>
+ * Every multiplier below comes from the world's {@link SiegeRules} (horde size, escalation, enemy health
+ * and damage, champion frequency, boss interval and roster, wave duration).
  * <ul>
- *   <li><b>Threat budget</b> = (18 x 1.12^(w-1) + 8(w-1)) x difficulty x player factor. Each zombie costs
+ *   <li><b>Threat budget</b> = (18 x 1.12^(w-1) + 8(w-1)) x horde size x player factor. Each zombie costs
  *       points (type cost x rank cost multiplier x 2.5 for champions).</li>
  *   <li><b>Ranks</b> drift upward: the centre rank is (w-1)/7, with a gaussian spread, so wave 8 sees mostly
  *       Feral, wave 15 Armored, wave 22 Corrupted, wave 29+ Abyssal.</li>
@@ -84,32 +85,39 @@ public final class WavePlanner {
     private WavePlanner() {
     }
 
-    public static float hpScale(int wave) {
-        return (float) ((1 + 0.07 * (wave - 1)) * Math.sqrt(SiegeConfig.DIFFICULTY.get()));
+    public static float hpScale(SiegeRules r, int wave) {
+        return (float) ((1 + 0.07 * (wave - 1)) * r.get(SiegeRules.ENEMY_HEALTH));
     }
 
-    public static float damageScale(int wave) {
-        return (float) ((1 + 0.035 * (wave - 1)) * Math.sqrt(SiegeConfig.DIFFICULTY.get()));
+    public static float damageScale(SiegeRules r, int wave) {
+        return (float) ((1 + 0.035 * (wave - 1)) * r.get(SiegeRules.ENEMY_DAMAGE));
     }
 
-    public static float budget(int wave, int players, NightModifier mod) {
-        double b = 18 * Math.pow(1.12, wave - 1) + 8 * (wave - 1);
-        b *= SiegeConfig.DIFFICULTY.get();
+    public static float budget(SiegeRules r, int wave, int players, NightModifier mod) {
+        double growth = 0.12 * r.get(SiegeRules.GROWTH);
+        double b = 18 * Math.pow(1 + growth, wave - 1) + 8 * r.get(SiegeRules.GROWTH) * (wave - 1);
+        b *= r.get(SiegeRules.WAVE_SIZE);
         b *= 1 + 0.5 * Math.max(0, players - 1);
         if (mod == NightModifier.HORDE) b *= 1.6;
         return (float) b;
     }
 
-    public static boolean isBossWave(int wave) {
-        return wave % 5 == 0;
+    /** How long (ticks) a wave keeps sending groups. */
+    public static int duration(SiegeRules r, int wave) {
+        return (int) (Math.min(2400 + wave * 60, 5400) * r.get(SiegeRules.WAVE_LENGTH));
     }
 
-    public static List<BossKind> bossesFor(int wave) {
+    /** Bosses leading this wave, cycling through the enabled bosses; after wave 30 several arrive together. */
+    public static List<BossKind> bossesFor(SiegeRules r, int wave) {
         List<BossKind> out = new ArrayList<>();
-        if (!isBossWave(wave)) return out;
-        int idx = (wave / 5 - 1);
+        if (!r.isBossWave(wave)) return out;
+        List<BossKind> enabled = new ArrayList<>();
+        for (BossKind b : BossKind.values()) if (r.bossEnabled(b)) enabled.add(b);
+        if (enabled.isEmpty()) return out;
+        int idx = wave / Math.max(1, r.i(SiegeRules.BOSS_EVERY)) - 1;
         int count = wave <= 30 ? 1 : Math.min(3, 1 + (wave - 30) / 15);
-        for (int i = 0; i < count; i++) out.add(BossKind.values()[(idx + i * 2) % BossKind.values().length]);
+        count = Math.min(count, enabled.size());
+        for (int i = 0; i < count; i++) out.add(enabled.get(Math.floorMod(idx + i * 2, enabled.size())));
         return out;
     }
 
@@ -135,28 +143,45 @@ public final class WavePlanner {
         return w;
     }
 
-    public static List<Group> plan(int wave, int players, NightModifier mod, RandomSource rnd) {
-        float budget = budget(wave, players, mod);
+    public static List<Group> plan(SiegeRules r, int wave, int players, NightModifier mod, RandomSource rnd) {
+        float budget = budget(r, wave, players, mod);
         List<Unit> units = new ArrayList<>();
-        List<BossKind> bosses = bossesFor(wave);
+        List<BossKind> bosses = bossesFor(r, wave);
         if (!bosses.isEmpty()) budget *= 0.65f;
 
         double rankCentre = (wave - 1) / 7.0 - (mod == NightModifier.HORDE ? 1.0 : 0.0);
-        float champChance = wave >= 4 ? Math.min(0.15f, 0.02f + 0.005f * wave) : 0f;
+        float champChance = wave >= 4 ? Math.min(0.15f, 0.02f + 0.005f * wave) * r.f(SiegeRules.CHAMPIONS) : 0f;
         if (mod == NightModifier.ELITE) champChance *= 3f;
+        champChance = Math.min(0.9f, champChance);
         int maxShriekers = 1 + wave / 10, maxNecros = 1 + wave / 12, maxAboms = wave / 8, maxIncin = 1 + wave / 7;
         int shriekers = 0, necros = 0, aboms = 0, incins = 0;
 
         List<ZombieKind> pool = new ArrayList<>();
-        for (ZombieKind k : ZombieKind.values()) if (k.unlockWave <= wave) pool.add(k);
+        for (ZombieKind k : ZombieKind.values()) if (k.unlockWave <= wave && r.zombieEnabled(k)) pool.add(k);
+        if (pool.isEmpty()) {
+            // everything unlocked so far is switched off: field the earliest enabled archetype instead
+            ZombieKind first = null;
+            for (ZombieKind k : ZombieKind.values()) {
+                if (r.zombieEnabled(k) && (first == null || k.unlockWave < first.unlockWave)) first = k;
+            }
+            pool.add(first != null ? first : ZombieKind.SHAMBLER);
+        }
+        ZombieKind cheapest = pool.get(0);
+        for (ZombieKind k : pool) if (k.cost < cheapest.cost) cheapest = k;
+        boolean onlyCapped = true;
+        for (ZombieKind k : pool) {
+            if (k != ZombieKind.SHRIEKER && k != ZombieKind.NECROMANCER && k != ZombieKind.ABOMINATION && k != ZombieKind.INCINERATOR) onlyCapped = false;
+        }
 
         int guard = 0;
         while (budget > 0.9f && guard++ < 2000) {
             ZombieKind kind = pick(pool, wave, rnd);
-            if (kind == ZombieKind.SHRIEKER && shriekers >= maxShriekers) continue;
-            if (kind == ZombieKind.NECROMANCER && necros >= maxNecros) continue;
-            if (kind == ZombieKind.ABOMINATION && aboms >= maxAboms) continue;
-            if (kind == ZombieKind.INCINERATOR && incins >= maxIncin) continue;
+            if (!onlyCapped) {
+                if (kind == ZombieKind.SHRIEKER && shriekers >= maxShriekers) continue;
+                if (kind == ZombieKind.NECROMANCER && necros >= maxNecros) continue;
+                if (kind == ZombieKind.ABOMINATION && aboms >= maxAboms) continue;
+                if (kind == ZombieKind.INCINERATOR && incins >= maxIncin) continue;
+            }
             int rank = Mth.clamp((int) Math.round(rankCentre + rnd.nextGaussian() * 0.8), 0, 4);
             int affixes = 0;
             if (rnd.nextFloat() < champChance) {
@@ -172,7 +197,7 @@ public final class WavePlanner {
                 affixes = 0;
                 cost = kind.cost * ZombieRank.byId(rank).costMult;
             }
-            if (cost > budget * 1.25f && kind != ZombieKind.SHAMBLER) continue;
+            if (cost > budget * 1.25f && kind != cheapest) continue;
             budget -= cost;
             if (kind == ZombieKind.SHRIEKER) shriekers++;
             if (kind == ZombieKind.NECROMANCER) necros++;
@@ -181,10 +206,13 @@ public final class WavePlanner {
             units.add(new Unit(kind.ordinal(), rank, affixes));
         }
 
-        // Light ordering: weaker units early, heavies and specials later, with noise.
-        units.sort(Comparator.comparingDouble(u -> ZombieKind.values()[u.kind()].cost * (1 + u.rank() * 0.4) + rnd.nextFloat() * 3));
+        // Light ordering: weaker units early, heavies and specials later, with noise. The noisy keys are drawn
+        // once per unit: a comparator that re-rolls on every comparison breaks TimSort on big waves.
+        java.util.Map<Unit, Double> order = new java.util.IdentityHashMap<>();
+        for (Unit u : units) order.put(u, ZombieKind.values()[u.kind()].cost * (1 + u.rank() * 0.4) + rnd.nextFloat() * 3.0);
+        units.sort(Comparator.comparingDouble(order::get));
 
-        int duration = Math.min(2400 + wave * 60, 5400);
+        int duration = duration(r, wave);
         int fronts = wave < 3 ? 1 : wave < 6 ? 2 : wave < 10 ? 3 : wave < 15 ? 4 : 6;
         float base = rnd.nextFloat() * Mth.TWO_PI;
         float[] frontAngles = new float[fronts];
