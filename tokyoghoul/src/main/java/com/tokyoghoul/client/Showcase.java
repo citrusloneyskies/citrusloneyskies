@@ -8,6 +8,7 @@ import com.tokyoghoul.data.Characters;
 import com.tokyoghoul.entity.TGCharacterEntity;
 import com.tokyoghoul.item.QuinqueKind;
 import com.tokyoghoul.move.Anims;
+import com.tokyoghoul.network.Packets.Action;
 import com.tokyoghoul.move.MoveDef;
 import com.tokyoghoul.player.PlayerActions;
 import com.tokyoghoul.player.PlayerCaps;
@@ -164,16 +165,171 @@ public final class Showcase {
                     if (ticks == 380) grab(mc, "61_battle_b");
                     if (ticks == 500) grab(mc, "62_battle_c");
                     if (ticks == 520) {
-                        TokyoGhoul.LOGGER.info("[Showcase] complete");
-                        mc.stop();
+                        stage = 5;
+                        ticks = 0;
+                        MinecraftServer server = mc.getSingleplayerServer();
+                        if (server != null) server.execute(() -> playtestSetup(server, mc.player.getUUID()));
                     }
                 }
+                case 5 -> playtest(mc);
                 default -> {
                 }
             }
         } catch (Exception | LinkageError err) {
             com.tokyoghoul.util.Safe.report("Showcase", err);
         }
+    }
+
+    // ------------------------------------------------------------------ playtest
+
+    /**
+     * Plays as Kaneki against a live CCG investigator using the real key packets (the same path as
+     * pressing C, X, R, Z, G and B), photographing each technique and logging the outcome.
+     */
+    private static void playtest(Minecraft mc) {
+        if (mc.player == null) return;
+        int t = ticks;
+        if (t == 20) {
+            mc.options.hideGui = false;
+            mc.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK);
+        }
+        if (t >= 20 && t % 2 == 0) faceTarget(mc);
+        switch (t) {
+            case 40 -> key(Action.TOGGLE_KAGUNE);
+            case 60 -> {
+                key(Action.RESET);
+                key(Action.USE_PRESS);
+            }
+            case 62 -> key(Action.USE_RELEASE);
+            case 66 -> grab(mc, "70_play_attack");
+            case 80 -> {
+                key(Action.CYCLE_NEXT);
+                key(Action.USE_PRESS);
+            }
+            case 82 -> key(Action.USE_RELEASE);
+            case 110 -> {
+                key(Action.CYCLE_NEXT);
+                key(Action.USE_PRESS);
+            }
+            case 128 -> grab(mc, "71_play_barrage");
+            case 150 -> key(Action.USE_RELEASE);
+            case 170 -> {
+                key(Action.CYCLE_NEXT);
+                key(Action.USE_PRESS);
+            }
+            case 172 -> key(Action.USE_RELEASE);
+            case 180 -> grab(mc, "72_play_rinkaku_pierce");
+            case 210 -> {
+                key(Action.CYCLE_NEXT);
+                key(Action.USE_PRESS);
+            }
+            case 212 -> key(Action.USE_RELEASE);
+            case 219 -> grab(mc, "73_play_tentacle_lash");
+            case 250 -> {
+                key(Action.CYCLE_NEXT);
+                key(Action.USE_PRESS);
+            }
+            case 252 -> key(Action.USE_RELEASE);
+            case 268 -> grab(mc, "74_play_kagune_grab");
+            case 310 -> key(Action.GUARD_PRESS);
+            case 325 -> grab(mc, "75_play_guard");
+            case 340 -> key(Action.GUARD_RELEASE);
+            case 345 -> key(Action.DODGE);
+            case 360 -> {
+                // X then Shift+R wraps to the ultimate: Kakuja Centipede
+                key(Action.RESET);
+                key(Action.CYCLE_PREV);
+                key(Action.USE_PRESS);
+            }
+            case 362 -> key(Action.USE_RELEASE);
+            case 410 -> grab(mc, "76_play_kakuja");
+            case 420 -> {
+                key(Action.RESET);
+                key(Action.CYCLE_NEXT);
+                key(Action.CYCLE_NEXT);
+                key(Action.CYCLE_NEXT);
+                key(Action.USE_PRESS);
+            }
+            case 422 -> key(Action.USE_RELEASE);
+            case 432 -> grab(mc, "77_play_kakuja_pierce");
+            case 480 -> {
+                MinecraftServer server = mc.getSingleplayerServer();
+                if (server != null) server.execute(() -> playtestReport(server, mc.player.getUUID()));
+            }
+            case 500 -> {
+                TokyoGhoul.LOGGER.info("[Showcase] complete");
+                mc.stop();
+            }
+            default -> {
+            }
+        }
+    }
+
+    private static void key(Action a) {
+        com.tokyoghoul.network.TGNet.CHANNEL.sendToServer(new com.tokyoghoul.network.Packets.Key(a));
+    }
+
+    private static void faceTarget(Minecraft mc) {
+        if (mc.level == null) return;
+        TGCharacterEntity near = null;
+        double best = 40 * 40;
+        for (var e : mc.level.entitiesForRendering()) {
+            if (e instanceof TGCharacterEntity t && t.isAlive() && t.fighterDef().id.equals("investigator")) {
+                double d = t.distanceToSqr(mc.player);
+                if (d < best) {
+                    best = d;
+                    near = t;
+                }
+            }
+        }
+        if (near != null) mc.player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, near.getEyePosition());
+    }
+
+    private static int playtestErrors;
+
+    private static void playtestSetup(MinecraftServer server, java.util.UUID id) {
+        ServerLevel level = server.overworld();
+        level.setDayTime(6000);
+        for (var e : level.getAllEntities()) {
+            if (e instanceof TGCharacterEntity t && !t.isNoAi()) t.discard();
+        }
+        ServerPlayer p = server.getPlayerList().getPlayer(id);
+        if (p == null) return;
+        p.setGameMode(GameType.SURVIVAL);
+        p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.DAMAGE_RESISTANCE, 20000, 3, false, false));
+        p.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.REGENERATION, 20000, 2, false, false));
+        var d = PlayerCaps.get(p);
+        d.kakuja = 100;
+        d.rc = d.maxRc();
+        d.state.kaguneToggled = false;
+        d.state.form = null;
+        d.state.formTicks = 0;
+        p.connection.teleport(0.5, GROUND, -150.5, 0, 10);
+        TGCharacterEntity inv = place(level, "investigator", 0.5, -145.5, false);
+        if (inv != null) {
+            inv.setNoAi(false);
+            inv.setFighterLevel(4);
+            inv.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(400);
+            inv.setHealth(400);
+            inv.setTarget(p);
+        }
+        playtestErrors = com.tokyoghoul.util.Safe.ERRORS.get();
+        com.tokyoghoul.network.Sync.playerData(p);
+    }
+
+    private static void playtestReport(MinecraftServer server, java.util.UUID id) {
+        ServerPlayer p = server.getPlayerList().getPlayer(id);
+        String inv = "dead";
+        for (var e : server.overworld().getAllEntities()) {
+            if (e instanceof TGCharacterEntity t && t.fighterDef().id.equals("investigator") && !t.isNoAi()) {
+                inv = String.format("%.0f/%.0f HP", t.getHealth(), t.getMaxHealth());
+            }
+        }
+        var d = p == null ? null : PlayerCaps.get(p);
+        TokyoGhoul.LOGGER.info("[Playtest] investigator {} | player HP {} | Rc {}/{} | fame {} kills {} | kakuja form {} | new errors {}", inv,
+                p == null ? "?" : String.format("%.1f", p.getHealth()), d == null ? 0 : (int) d.rc, d == null ? 0 : (int) d.maxRc(),
+                d == null ? 0 : (int) d.fame, d == null ? 0 : d.kills, d != null && d.state.transformed(),
+                com.tokyoghoul.util.Safe.ERRORS.get() - playtestErrors);
     }
 
     private static void createWorld(Minecraft mc) {
