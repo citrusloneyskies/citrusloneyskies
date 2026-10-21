@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " K ",
+    " I ",
+    " S "
+  ],
+  "key": {
+    "K": {
+      "item": "tokyoghoul:kakuhou_ukaku"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "item": "tokyoghoul:quinque_ukaku",
+    "count": 1
+  }
+}

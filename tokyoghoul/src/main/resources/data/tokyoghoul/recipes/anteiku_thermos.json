@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " I ",
+    "ICI",
+    " I "
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "C": {
+      "item": "tokyoghoul:anteiku_coffee"
+    }
+  },
+  "result": {
+    "item": "tokyoghoul:anteiku_thermos",
+    "count": 1
+  }
+}

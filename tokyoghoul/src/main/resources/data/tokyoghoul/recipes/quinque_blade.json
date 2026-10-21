@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "minecraft:iron_sword"
+    },
+    {
+      "item": "tokyoghoul:rc_cells"
+    },
+    {
+      "item": "tokyoghoul:rc_cells"
+    }
+  ],
+  "result": {
+    "item": "tokyoghoul:quinque_blade",
+    "count": 1
+  }
+}

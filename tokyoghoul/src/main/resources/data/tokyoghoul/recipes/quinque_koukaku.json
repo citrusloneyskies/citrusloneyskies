@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " K ",
+    " I ",
+    " S "
+  ],
+  "key": {
+    "K": {
+      "item": "tokyoghoul:kakuhou_koukaku"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "item": "tokyoghoul:quinque_koukaku",
+    "count": 1
+  }
+}
